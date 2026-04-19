@@ -1,6 +1,6 @@
-# FRWA — Fund Raising Web Application
+# Hello Goodbye — Fund Raising Web Application
 
-A React.js frontend for an online fundraising platform (CSIT314 group project), built with the **BCE (Boundary – Control – Entity)** architectural framework. Data is mocked entirely in the browser — no backend required.
+A React.js frontend for an online fundraising platform (CSIT314 group project), built with the **BCE (Boundary – Control – Entity)** architectural framework. Data is mocked entirely in the browser — no backend yet.
 
 ---
 
