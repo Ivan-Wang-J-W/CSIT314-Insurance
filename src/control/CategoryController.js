@@ -6,8 +6,13 @@ import { KEYS, readCollection, writeCollection, nextId } from './dataStore.js';
 import { Category } from '../entity/Category.js';
 
 export const CategoryController = {
-  list() {
+  all() {
     return readCollection(KEYS.CATEGORIES).map((c) => new Category(c));
+  },
+
+  /** @deprecated Use all() instead. */
+  list() {
+    return this.all();
   },
 
   /** Only categories that are active — used when populating FSA creation form. */
