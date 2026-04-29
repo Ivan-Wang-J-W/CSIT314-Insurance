@@ -33,7 +33,7 @@ class Campaign:
         return min(100.0, round(self.raised_amount / self.goal_amount * 100, 2))
 
     def is_within_10_percent_of_goal(self) -> bool:
-        """True when raised amount is >= 90% of goal (used for D-03 alerts)."""
+        """true when amount raised is >= 90% of goal (for D-03 alerts)."""
         return self.raised_amount >= self.goal_amount * 0.9
 
     def is_goal_reached(self) -> bool:

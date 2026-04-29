@@ -8,12 +8,10 @@ import data.store as store
 from entity.campaign import Campaign, URGENCY_TIERS
 
 
-def list_campaigns(urgency_tier: str = None, status: str = None,
-                   fundraiser_id: str = None, category: str = None,
-                   keyword: str = None) -> list:
+def list_campaigns(urgency_tier: str = None, status: str = None,fundraiser_id: str = None, category: str = None,keyword: str = None) -> list:
     """
-    G-01: public listing (defaults to ACTIVE only).
-    D-01: filter by urgency_tier.
+    (G-01): public listing (defaults to ACTIVE only).
+    (D-01): filter by urgency_tier.
     """
     campaigns = store.get_all_campaigns()
 
@@ -40,15 +38,14 @@ def list_campaigns(urgency_tier: str = None, status: str = None,
     return [Campaign.from_dict(c).to_dict() for c in campaigns]
 
 
-def get_campaign(campaign_id: str) -> dict:
-    c = store.get_campaign_by_id(campaign_id)
+def get_campaign(campaign_id: str) -> dict: c = store.get_campaign_by_id(campaign_id)
     if not c:
         raise ValueError("Campaign not found")
     return Campaign.from_dict(c).to_dict()
 
 
 def create_campaign(data: dict, fundraiser_id: str) -> dict:
-    """FR-02: upload images and detailed descriptions for a campaign."""
+    """(FR-02): upload images and detailed descriptions for a campaign."""
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
     category = data.get("category", "").strip()
@@ -80,8 +77,7 @@ def create_campaign(data: dict, fundraiser_id: str) -> dict:
     return Campaign.from_dict(campaign).to_dict()
 
 
-def update_campaign(campaign_id: str, patch: dict, fundraiser_id: str) -> dict:
-    existing = store.get_campaign_by_id(campaign_id)
+def update_campaign(campaign_id: str, patch: dict, fundraiser_id: str) -> dict: existing = store.get_campaign_by_id(campaign_id)
     if not existing:
         raise ValueError("Campaign not found")
     if existing["fundraiser_id"] != fundraiser_id:
