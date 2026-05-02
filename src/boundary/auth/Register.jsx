@@ -24,23 +24,27 @@ export default function Register() {
   });
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const onChange = (e) => setValues((v) => ({ ...v, [e.target.name]: e.target.value }));
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setSubmitError('');
     const { errors: vErr, valid } = validateForm(values, SCHEMA);
     setErrors(vErr);
     if (!valid) return;
 
+    setSubmitting(true);
     try {
-      const user = register(values);
+      const user = await register(values);
       navigate(user.role === ROLES.FUNDRAISER ? '/fundraiser' : '/donee', { replace: true });
     } catch (err) {
       setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -76,7 +80,9 @@ export default function Register() {
                 <MenuItem value={ROLES.FUNDRAISER}>Run fundraising campaigns</MenuItem>
               </TextField>
 
-              <Button type="submit" variant="contained" size="large">Create account</Button>
+              <Button type="submit" variant="contained" size="large" disabled={submitting}>
+                {submitting ? 'Creating account…' : 'Create account'}
+              </Button>
             </Stack>
           </form>
 

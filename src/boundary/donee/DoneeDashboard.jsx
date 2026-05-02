@@ -1,4 +1,5 @@
 /** Donee dashboard — personal giving stats + recent activity. */
+import { useEffect, useState } from 'react';
 import { Grid, Card, CardContent, Typography, List, ListItem, ListItemText, Button, Stack } from '@mui/material';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CampaignIcon from '@mui/icons-material/Campaign';
@@ -15,16 +16,33 @@ import { formatCurrency, timeAgo } from '../../utils/formatters.js';
 
 export default function DoneeDashboard() {
   const { user } = useAuth();
-  const donations = DonationController.all().filter((d) => d.doneeId === user.id);
+  const [donations, setDonations] = useState([]);
+  const [favs, setFavs] = useState([]);
+  const [supportedFSAs, setSupportedFSAs] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      DonationController.searchForDonee(user.id, { pageSize: 1000 }),
+      FavoriteController.favoriteFSAs(user.id),
+    ])
+      .then(([donResult, favsList]) => {
+        const dons = donResult.items || [];
+        setDonations(dons);
+        setFavs(favsList);
+        const fsaIds = [...new Set(dons.map((d) => d.fsaId))];
+        return Promise.all(fsaIds.map((id) => FSAController.getById(id).catch(() => null)));
+      })
+      .then((fsas) => setSupportedFSAs(fsas.filter(Boolean)))
+      .catch(() => {});
+  }, [user]);
+
   const totalGiven = donations.reduce((s, d) => s + d.amount, 0);
-  const favs = FavoriteController.favoriteFSAs(user.id);
-  const supportedFSAIds = new Set(donations.map((d) => d.fsaId));
-  const supportedFSAs = FSAController.all().filter((f) => supportedFSAIds.has(f.id));
 
   return (
     <>
       <PageHeader
-        title={`Hi, ${user.fullName?.split(' ')[0] || user.username}`}
+        title={`Hi, ${user?.fullName?.split(' ')[0] || user?.username}`}
         subtitle="Your impact at a glance"
         actions={
           <Button variant="contained" startIcon={<SearchIcon />} component={RouterLink} to="/donee/browse">

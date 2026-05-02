@@ -16,12 +16,48 @@ campaign_bp = Blueprint("campaigns", __name__)
 @campaign_bp.get("/")
 def list_campaigns():
     """G-01: browse campaigns without login. D-01: filter by urgency_tier."""
-    urgency_tier = request.args.get("urgency_tier")
+    keyword = request.args.get("q") or request.args.get("keyword")
     category = request.args.get("category")
-    keyword = request.args.get("keyword")
+    fundraiser_id = request.args.get("fundraiser_id")
+    status = request.args.get("status")
+    urgency_tier = request.args.get("urgency_tier")
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 12))
+
     campaigns = camp_ctrl.list_campaigns(
-        urgency_tier=urgency_tier, category=category, keyword=keyword
+        urgency_tier=urgency_tier,
+        category=category,
+        keyword=keyword,
+        status=status,
+        fundraiser_id=fundraiser_id,
     )
+    total = len(campaigns)
+    start = (page - 1) * page_size
+    paged = campaigns[start: start + page_size]
+    return jsonify({"campaigns": paged, "total": total}), 200
+
+
+@campaign_bp.get("/history")
+@require_role("PLATFORM_MANAGER", "ADMIN")
+def campaign_history():
+    """PM-10: search history of approved/rejected/suspended campaigns."""
+    status_param = request.args.get("status")
+    status_list = status_param.split(",") if status_param else None
+    keyword = request.args.get("q") or request.args.get("keyword")
+    campaigns = camp_ctrl.search_campaign_history(
+        status_list=status_list,
+        category=request.args.get("category"),
+        fundraiser_id=request.args.get("fundraiser_id"),
+        keyword=keyword,
+    )
+    return jsonify({"campaigns": campaigns, "total": len(campaigns)}), 200
+
+
+@campaign_bp.get("/favorites")
+@require_role("DONEE")
+def get_favorites():
+    """Return all campaigns saved by the current donee."""
+    campaigns = donation_ctrl.get_favorites_for_donee(g.current_user["id"])
     return jsonify({"campaigns": campaigns}), 200
 
 
@@ -75,6 +111,13 @@ def get_progress(campaign_id):
         return jsonify({"error": str(e)}), 404
 
 
+@campaign_bp.get("/<campaign_id>/donations")
+def get_campaign_donations(campaign_id):
+    """Return all donations for a specific campaign."""
+    donations = donation_ctrl.get_donations_for_campaign(campaign_id)
+    return jsonify({"donations": donations}), 200
+
+
 @campaign_bp.post("/<campaign_id>/approve")
 @require_role("PLATFORM_MANAGER")
 def approve_campaign(campaign_id):
@@ -109,21 +152,6 @@ def suspend_campaign(campaign_id):
         return jsonify({"error": str(e)}), 400
 
 
-@campaign_bp.get("/history")
-@require_role("PLATFORM_MANAGER", "ADMIN")
-def campaign_history():
-    """PM-10: search history of approved/rejected/suspended campaigns."""
-    status_param = request.args.get("status")
-    status_list = status_param.split(",") if status_param else None
-    campaigns = camp_ctrl.search_campaign_history(
-        status_list=status_list,
-        category=request.args.get("category"),
-        fundraiser_id=request.args.get("fundraiser_id"),
-        keyword=request.args.get("keyword"),
-    )
-    return jsonify({"campaigns": campaigns}), 200
-
-
 # ---------------------------------------------------------------------------
 # Milestone sub-resource
 # ---------------------------------------------------------------------------
@@ -155,7 +183,7 @@ def get_milestones(campaign_id):
 
 
 # ---------------------------------------------------------------------------
-# Favorite / alert sub-resources
+# Favorite sub-resource
 # ---------------------------------------------------------------------------
 
 @campaign_bp.post("/<campaign_id>/favorite")

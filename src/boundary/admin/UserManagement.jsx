@@ -1,7 +1,7 @@
 /** Admin's user-management page: search, filter, suspend/reactivate, delete. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box, Button, Card, Chip, IconButton, MenuItem, Pagination, Stack, Table, TableBody,
+  Box, Card, Chip, IconButton, MenuItem, Pagination, Stack, Table, TableBody,
   TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
 import BlockIcon from '@mui/icons-material/Block';
@@ -20,33 +20,37 @@ const PAGE_SIZE = 10;
 export default function UserManagement() {
   const [filters, setFilters] = useState({ q: '', role: '', status: '' });
   const [page, setPage] = useState(1);
-  const [version, setVersion] = useState(0); // bump to force reload after mutation
+  const [version, setVersion] = useState(0);
   const [confirm, setConfirm] = useState(null);
+  const [result, setResult] = useState({ items: [], total: 0 });
   const toast = useToast();
 
-  const { items, total } = useMemo(
-    () => UserController.search({ ...filters, page, pageSize: PAGE_SIZE }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, page, version]
-  );
+  useEffect(() => {
+    UserController.search({ ...filters, page, pageSize: PAGE_SIZE })
+      .then(setResult)
+      .catch(() => {});
+  }, [filters, page, version]);
+
+  const { items, total } = result;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const handleFilterChange = (field) => (e) => {
-    setFilters((f) => ({ ...f, [field]: e.target.value }));
-    setPage(1);
-  };
+  const handleFilterChange = (field) => (e) => { setFilters((f) => ({ ...f, [field]: e.target.value })); setPage(1); };
 
-  const doConfirm = () => {
+  const doConfirm = async () => {
     if (!confirm) return;
     const { user, action } = confirm;
-    if (action === 'delete') {
-      UserController.delete(user.id);
-      toast.success(`User @${user.username} deleted`);
-    } else {
-      UserController.toggleStatus(user.id);
-      toast.success(`@${user.username} ${action === 'suspend' ? 'suspended' : 'reactivated'}`);
+    try {
+      if (action === 'delete') {
+        await UserController.delete(user.id);
+        toast.success(`User @${user.username} deleted`);
+      } else {
+        await UserController.toggleStatus(user.id);
+        toast.success(`@${user.username} ${action === 'suspend' ? 'suspended' : 'reactivated'}`);
+      }
+      setVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(err.message);
     }
-    setVersion((v) => v + 1);
   };
 
   return (
@@ -55,15 +59,11 @@ export default function UserManagement() {
 
       <Card sx={{ p: 2, mb: 2 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
-            label="Search" placeholder="Username, email, name…"
-            value={filters.q} onChange={handleFilterChange('q')} fullWidth
-          />
+          <TextField label="Search" placeholder="Username, email, name…"
+            value={filters.q} onChange={handleFilterChange('q')} fullWidth />
           <TextField select label="Role" value={filters.role} onChange={handleFilterChange('role')} sx={{ minWidth: 200 }}>
             <MenuItem value="">All roles</MenuItem>
-            {Object.values(ROLES).map((r) => (
-              <MenuItem key={r} value={r}>{ROLE_LABELS[r]}</MenuItem>
-            ))}
+            {Object.values(ROLES).map((r) => <MenuItem key={r} value={r}>{ROLE_LABELS[r]}</MenuItem>)}
           </TextField>
           <TextField select label="Status" value={filters.status} onChange={handleFilterChange('status')} sx={{ minWidth: 160 }}>
             <MenuItem value="">All statuses</MenuItem>
@@ -81,12 +81,8 @@ export default function UserManagement() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>User</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Joined</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell>User</TableCell><TableCell>Email</TableCell><TableCell>Role</TableCell>
+                  <TableCell>Status</TableCell><TableCell>Joined</TableCell><TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -99,31 +95,17 @@ export default function UserManagement() {
                     <TableCell>{u.email}</TableCell>
                     <TableCell>{ROLE_LABELS[u.role]}</TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        label={u.status}
-                        color={u.status === 'ACTIVE' ? 'success' : 'warning'}
-                      />
+                      <Chip size="small" label={u.status} color={u.status === 'ACTIVE' ? 'success' : 'warning'} />
                     </TableCell>
                     <TableCell>{formatDate(u.createdAt)}</TableCell>
                     <TableCell align="right">
                       <Tooltip title={u.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}>
-                        <IconButton
-                          onClick={() => setConfirm({
-                            user: u,
-                            action: u.status === 'ACTIVE' ? 'suspend' : 'reactivate',
-                          })}
-                          size="small"
-                        >
+                        <IconButton onClick={() => setConfirm({ user: u, action: u.status === 'ACTIVE' ? 'suspend' : 'reactivate' })} size="small">
                           {u.status === 'ACTIVE' ? <BlockIcon /> : <CheckCircleIcon color="success" />}
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton
-                          onClick={() => setConfirm({ user: u, action: 'delete' })}
-                          size="small"
-                          color="error"
-                        >
+                        <IconButton onClick={() => setConfirm({ user: u, action: 'delete' })} size="small" color="error">
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
@@ -134,7 +116,6 @@ export default function UserManagement() {
             </Table>
           </Box>
         )}
-
         {pageCount > 1 && (
           <Stack direction="row" justifyContent="center" sx={{ p: 2 }}>
             <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" />
@@ -144,11 +125,7 @@ export default function UserManagement() {
 
       <ConfirmDialog
         open={Boolean(confirm)}
-        title={
-          confirm?.action === 'delete'     ? 'Delete user?' :
-          confirm?.action === 'suspend'    ? 'Suspend user?' :
-                                            'Reactivate user?'
-        }
+        title={confirm?.action === 'delete' ? 'Delete user?' : confirm?.action === 'suspend' ? 'Suspend user?' : 'Reactivate user?'}
         message={
           confirm?.action === 'delete'
             ? `Permanently remove @${confirm?.user?.username}? This action cannot be undone.`
@@ -156,16 +133,8 @@ export default function UserManagement() {
             ? `@${confirm?.user?.username} will lose access until reactivated. Continue?`
             : `Restore full access for @${confirm?.user?.username}?`
         }
-        confirmText={
-          confirm?.action === 'delete'  ? 'Yes, delete' :
-          confirm?.action === 'suspend' ? 'Yes, suspend' :
-                                         'Yes, reactivate'
-        }
-        variant={
-          confirm?.action === 'delete'     ? 'danger' :
-          confirm?.action === 'suspend'    ? 'warning' :
-                                            'success'
-        }
+        confirmText={confirm?.action === 'delete' ? 'Yes, delete' : confirm?.action === 'suspend' ? 'Yes, suspend' : 'Yes, reactivate'}
+        variant={confirm?.action === 'delete' ? 'danger' : confirm?.action === 'suspend' ? 'warning' : 'success'}
         onConfirm={doConfirm}
         onClose={() => setConfirm(null)}
       />

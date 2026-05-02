@@ -33,7 +33,7 @@ def register(data: dict) -> dict:
         raise ValueError("Username already taken")
 
     if store.get_user_by_email(email):
-        raise ValueError("Email address is already registered")
+        raise ValueError("Email already registered")
 
     user = store.create_user({
         "username": username,
@@ -54,6 +54,8 @@ def login(username: str, password: str) -> tuple[str, dict]:
     3. Returns (token, safe_user) or raises ValueError when failure to validate.
     """
     user = store.get_user_by_username(username)
+    if not user:
+        user = store.get_user_by_email(username.lower())
     if not user:
         raise ValueError("Invalid credentials")
 

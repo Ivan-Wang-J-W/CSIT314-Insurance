@@ -32,13 +32,17 @@ def create_donation():
 @donation_bp.get("/history")
 @require_role("DONEE")
 def donation_history():
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 10))
     donations = donation_ctrl.get_donation_history(
         donee_id=g.current_user["id"],
         category=request.args.get("category"),
         start_date=request.args.get("start_date"),
         end_date=request.args.get("end_date"),
     )
-    return jsonify({"donations": donations}), 200
+    total = len(donations)
+    start = (page - 1) * page_size
+    return jsonify({"donations": donations[start:start + page_size], "total": total}), 200
 
 
 @donation_bp.get("/alerts")
@@ -64,3 +68,10 @@ def mark_read(notif_id):
         return jsonify({"notification": notif}), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
+
+
+@donation_bp.post("/notifications/read-all")
+@require_auth
+def mark_all_read():
+    notif_ctrl.mark_all_read(g.current_user["id"])
+    return jsonify({"message": "All notifications marked as read"}), 200

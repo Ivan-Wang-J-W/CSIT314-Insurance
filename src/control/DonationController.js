@@ -1,84 +1,41 @@
-/**
- * DonationController
- * Handles donation creation and querying donation history.
- * Donating also updates the parent FSA's raised amount — single source of truth.
- */
-import { KEYS, readCollection, writeCollection, nextId } from './dataStore.js';
-import { Donation } from '../entity/Donation.js';
-import { FSAController } from './FSAController.js';
-import { FSA_STATUS } from '../entity/FSA.js';
-
-const hydrate = (list) => list.map((d) => new Donation(d));
+import { api } from '../utils/api.js';
+import { backendToDonation } from '../utils/mappers.js';
 
 export const DonationController = {
-  all() {
-    return hydrate(readCollection(KEYS.DONATIONS));
-  },
-
-  /**
-   * Create a donation.
-   * Side-effects: bumps FSA.raisedAmount and auto-completes FSA when goal is hit.
-   */
-  create({ fsaId, doneeId, amount, message = '', anonymous = false }) {
-    const fsa = FSAController.getById(fsaId);
-    if (!fsa) throw new Error('FSA not found');
-    if (fsa.status !== FSA_STATUS.ACTIVE) throw new Error('This FSA is not accepting donations');
-    if (!amount || amount <= 0) throw new Error('Donation amount must be positive');
-
-    const donation = new Donation({
-      id: nextId('don'), fsaId, doneeId,
-      amount: Number(amount), message, anonymous,
-      createdAt: new Date().toISOString(),
+  async create({ fsaId, doneeId, amount, message, anonymous }) {
+    const data = await api.post('/donations/', {
+      campaign_id: fsaId,
+      donee_id: doneeId,
+      amount,
+      message,
+      anonymous,
     });
-
-    writeCollection(KEYS.DONATIONS, [...readCollection(KEYS.DONATIONS), { ...donation }]);
-
-    const newRaised = fsa.raisedAmount + Number(amount);
-    FSAController.update(fsaId, {
-      raisedAmount: newRaised,
-      status: newRaised >= fsa.goalAmount ? FSA_STATUS.COMPLETED : fsa.status,
-    });
-    return donation;
+    return backendToDonation(data.donation);
   },
 
-  /** Search donations made by a specific donee, with filtering for history view. */
-  searchForDonee(doneeId, { categoryId = '', from = '', to = '', page = 1, pageSize = 10 } = {}) {
-    let list = this.all().filter((d) => d.doneeId === doneeId);
-
-    if (categoryId) {
-      // Category filter joins through the FSA record.
-      const fsas = FSAController.all();
-      const ids = new Set(fsas.filter((f) => f.categoryId === categoryId).map((f) => f.id));
-      list = list.filter((d) => ids.has(d.fsaId));
-    }
-    if (from) list = list.filter((d) => new Date(d.createdAt) >= new Date(from));
-    if (to) list = list.filter((d) => new Date(d.createdAt) <= new Date(to));
-
-    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const total = list.length;
-    const start = (page - 1) * pageSize;
-    return { items: list.slice(start, start + pageSize), total };
+  async forFSA(fsaId) {
+    const data = await api.get(`/campaigns/${fsaId}/donations`);
+    return (data.donations || []).map(backendToDonation);
   },
 
-  /** Donations received by FSAs owned by a fundraiser — used in FR analytics. */
-  forFundraiser(fundraiserId) {
-    const fsaIds = new Set(
-      FSAController.all().filter((f) => f.fundraiserId === fundraiserId).map((f) => f.id)
-    );
-    return this.all().filter((d) => fsaIds.has(d.fsaId));
+  async forFundraiser(fundraiserId) {
+    const { FSAController } = await import('./FSAController.js');
+    const { items } = await FSAController.search({ fundraiserId, pageSize: 1000 });
+    const groups = await Promise.all(items.map((f) => this.forFSA(f.id)));
+    return groups.flat();
   },
 
-  forFSA(fsaId) {
-    return this.all().filter((d) => d.fsaId === fsaId);
-  },
-
-  /** Aggregate stats for platform manager's dashboard. */
-  platformStats() {
-    const list = this.all();
+  async searchForDonee(doneeId, { categoryId, from, to, page = 1, pageSize = 10 } = {}) {
+    const params = new URLSearchParams();
+    if (categoryId) params.set('category', categoryId);
+    if (from) params.set('start_date', from);
+    if (to) params.set('end_date', to);
+    params.set('page', page);
+    params.set('page_size', pageSize);
+    const data = await api.get(`/donations/history?${params}`);
     return {
-      totalDonations: list.length,
-      totalAmount: list.reduce((sum, d) => sum + d.amount, 0),
-      averageAmount: list.length ? list.reduce((s, d) => s + d.amount, 0) / list.length : 0,
+      items: (data.donations || []).map(backendToDonation),
+      total: data.total || 0,
     };
   },
 };

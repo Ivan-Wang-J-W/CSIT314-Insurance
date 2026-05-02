@@ -43,6 +43,7 @@ import DonationHistory from './boundary/donee/DonationHistory.jsx';
 // Platform
 import PlatformDashboard from './boundary/platform/PlatformDashboard.jsx';
 import CategoryManagement from './boundary/platform/CategoryManagement.jsx';
+import CampaignReview from './boundary/platform/CampaignReview.jsx';
 import Reports from './boundary/platform/Reports.jsx';
 
 // Shared pages
@@ -128,6 +129,9 @@ export default function App() {
                 {/* Platform Manager */}
                 <Route path="/platform" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><PlatformDashboard /></ProtectedRoute>
+                } />
+                <Route path="/platform/campaigns" element={
+                  <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CampaignReview /></ProtectedRoute>
                 } />
                 <Route path="/platform/categories" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CategoryManagement /></ProtectedRoute>

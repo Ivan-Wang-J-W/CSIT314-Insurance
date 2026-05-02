@@ -27,11 +27,17 @@ def create_user():
 @user_bp.get("/")
 @require_role("ADMIN")
 def list_users():
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 10))
     users = user_ctrl.list_users(
+        q=request.args.get("q"),
         role=request.args.get("role"),
         status=request.args.get("status"),
     )
-    return jsonify({"users": users}), 200
+    total = len(users)
+    start = (page - 1) * page_size
+    paged = users[start: start + page_size]
+    return jsonify({"users": paged, "total": total}), 200
 
 
 @user_bp.get("/<user_id>")

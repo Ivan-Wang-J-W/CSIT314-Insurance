@@ -1,5 +1,5 @@
 /** Main search/browse page for donees — filters, sorting, pagination. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, Grid, MenuItem, Pagination, Stack, TextField } from '@mui/material';
 import PageHeader from '../common/PageHeader.jsx';
 import FSACard from '../common/FSACard.jsx';
@@ -19,24 +19,39 @@ export default function BrowseFSA() {
   const categories = CategoryController.list();
   const [filters, setFilters] = useState({ q: '', categoryId: '', sort: 'newest' });
   const [page, setPage] = useState(1);
-  const [version, setVersion] = useState(0);
+  const [result, setResult] = useState({ items: [], total: 0 });
+  const [favoritedIds, setFavoritedIds] = useState(new Set());
 
-  const { items, total } = useMemo(
-    () => FSAController.search({
-      ...filters, status: FSA_STATUS.ACTIVE, page, pageSize: PAGE_SIZE,
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, page, version]
-  );
+  useEffect(() => {
+    FSAController.search({ ...filters, status: FSA_STATUS.ACTIVE, page, pageSize: PAGE_SIZE })
+      .then(setResult)
+      .catch(() => {});
+  }, [filters, page]);
+
+  useEffect(() => {
+    if (!user) return;
+    FavoriteController.favoriteFSAs(user.id)
+      .then((favs) => setFavoritedIds(new Set(favs.map((f) => f.id))))
+      .catch(() => {});
+  }, [user]);
+
+  const { items, total } = result;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const onFilterChange = (k) => (e) => { setFilters((f) => ({ ...f, [k]: e.target.value })); setPage(1); };
 
-  const isFavorited = (fsaId) => FavoriteController.isFavorited(user.id, fsaId);
-  const toggleFavorite = (fsa) => {
-    const now = FavoriteController.toggle(user.id, fsa.id);
-    toast.success(now ? 'Saved to favourites' : 'Removed from favourites');
-    setVersion((v) => v + 1);
+  const toggleFavorite = async (fsa) => {
+    try {
+      const now = await FavoriteController.toggle(user.id, fsa.id);
+      toast.success(now ? 'Saved to favourites' : 'Removed from favourites');
+      setFavoritedIds((prev) => {
+        const next = new Set(prev);
+        if (now) next.add(fsa.id); else next.delete(fsa.id);
+        return next;
+      });
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   return (
@@ -52,7 +67,7 @@ export default function BrowseFSA() {
           <Grid item xs={12} sm={6} md={4}>
             <TextField select label="Category" value={filters.categoryId} onChange={onFilterChange('categoryId')} fullWidth>
               <MenuItem value="">All categories</MenuItem>
-              {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              {categories.map((c) => <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -77,7 +92,7 @@ export default function BrowseFSA() {
                   fsa={f}
                   linkTo={`/fsa/${f.id}`}
                   showFavoriteButton
-                  favorited={isFavorited(f.id)}
+                  favorited={favoritedIds.has(f.id)}
                   onToggleFavorite={toggleFavorite}
                 />
               </Grid>

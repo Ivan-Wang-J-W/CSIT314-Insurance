@@ -39,12 +39,18 @@ def create_user(data: dict) -> dict:
     return _safe(user)
 
 
-def list_users(role: str = None, status: str = None) -> list:
+def list_users(q: str = None, role: str = None, status: str = None) -> list:
     users = store.get_all_users()
     if role:
         users = [u for u in users if u["role"] == role]
     if status:
         users = [u for u in users if u["status"] == status]
+    if q:
+        q_lower = q.lower()
+        users = [u for u in users if
+                 q_lower in u["username"].lower()
+                 or q_lower in u.get("email", "").lower()
+                 or q_lower in u.get("full_name", "").lower()]
     return [_safe(u) for u in users]
 
 

@@ -63,9 +63,10 @@ const NAV_BY_ROLE = {
     { to: '/donee/history',   label: 'Donation History', icon: <HistoryIcon /> },
   ],
   [ROLES.PLATFORM_MANAGER]: [
-    { to: '/platform',            label: 'Dashboard',  icon: <DashboardIcon /> },
-    { to: '/platform/categories', label: 'Categories', icon: <CategoryIcon /> },
-    { to: '/platform/reports',    label: 'Reports',    icon: <AssessmentIcon /> },
+    { to: '/platform',            label: 'Dashboard',        icon: <DashboardIcon /> },
+    { to: '/platform/campaigns',  label: 'Campaign Review',  icon: <CampaignIcon /> },
+    { to: '/platform/categories', label: 'Categories',       icon: <CategoryIcon /> },
+    { to: '/platform/reports',    label: 'Reports',          icon: <AssessmentIcon /> },
   ],
 };
 

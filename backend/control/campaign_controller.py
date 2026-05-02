@@ -8,7 +8,9 @@ import data.store as store
 from entity.campaign import Campaign, URGENCY_TIERS
 
 
-def list_campaigns(urgency_tier: str = None, status: str = None,fundraiser_id: str = None, category: str = None,keyword: str = None) -> list:
+def list_campaigns(urgency_tier: str = None, status: str = None,
+                   fundraiser_id: str = None, category: str = None,
+                   keyword: str = None) -> list:
     """
     (G-01): public listing (defaults to ACTIVE only).
     (D-01): filter by urgency_tier.
@@ -16,9 +18,10 @@ def list_campaigns(urgency_tier: str = None, status: str = None,fundraiser_id: s
     campaigns = store.get_all_campaigns()
 
     if status:
-        statuses = status if isinstance(status, list) else [status]
+        statuses = status if isinstance(status, list) else [s.strip() for s in status.split(",")]
         campaigns = [c for c in campaigns if c["status"] in statuses]
-    else:
+    elif not fundraiser_id:
+        # Default to ACTIVE for public browsing; show all statuses for owner queries
         campaigns = [c for c in campaigns if c["status"] == "ACTIVE"]
 
     if urgency_tier:
@@ -38,7 +41,8 @@ def list_campaigns(urgency_tier: str = None, status: str = None,fundraiser_id: s
     return [Campaign.from_dict(c).to_dict() for c in campaigns]
 
 
-def get_campaign(campaign_id: str) -> dict: c = store.get_campaign_by_id(campaign_id)
+def get_campaign(campaign_id: str) -> dict:
+    c = store.get_campaign_by_id(campaign_id)
     if not c:
         raise ValueError("Campaign not found")
     return Campaign.from_dict(c).to_dict()
@@ -77,7 +81,8 @@ def create_campaign(data: dict, fundraiser_id: str) -> dict:
     return Campaign.from_dict(campaign).to_dict()
 
 
-def update_campaign(campaign_id: str, patch: dict, fundraiser_id: str) -> dict: existing = store.get_campaign_by_id(campaign_id)
+def update_campaign(campaign_id: str, patch: dict, fundraiser_id: str) -> dict:
+    existing = store.get_campaign_by_id(campaign_id)
     if not existing:
         raise ValueError("Campaign not found")
     if existing["fundraiser_id"] != fundraiser_id:

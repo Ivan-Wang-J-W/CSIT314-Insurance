@@ -1,5 +1,5 @@
 /** Daily / weekly / monthly reports for Platform Managers. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Button, Card, CardContent, Stack, Tab, Tabs, Table, TableBody, TableCell, TableHead, TableRow, Typography,
 } from '@mui/material';
@@ -16,20 +16,17 @@ const PERIODS = [
 
 export default function Reports() {
   const [period, setPeriod] = useState('daily');
-  const series = useMemo(() => ReportController.timeSeries(period), [period]);
+  const [series, setSeries] = useState([]);
 
-  // Totals per tab for quick reference.
+  useEffect(() => {
+    ReportController.timeSeries(period).then(setSeries).catch(() => setSeries([]));
+  }, [period]);
+
   const totals = series.reduce(
-    (acc, s) => ({
-      donations: acc.donations + s.donations,
-      amount: acc.amount + s.amount,
-      newFSAs: acc.newFSAs + s.newFSAs,
-      newUsers: acc.newUsers + s.newUsers,
-    }),
+    (acc, s) => ({ donations: acc.donations + s.donations, amount: acc.amount + s.amount, newFSAs: acc.newFSAs + s.newFSAs, newUsers: acc.newUsers + s.newUsers }),
     { donations: 0, amount: 0, newFSAs: 0, newUsers: 0 }
   );
 
-  // CSV export — simple, no external dependency.
   const exportCsv = () => {
     const rows = [
       ['Period', 'Donations', 'Amount', 'New FSAs', 'New Users'],
@@ -39,27 +36,17 @@ export default function Reports() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `frwa-${period}-report.csv`;
-    a.click();
+    a.href = url; a.download = `frwa-${period}-report.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <>
-      <PageHeader
-        title="Reports"
-        subtitle="Daily, weekly and monthly aggregates"
-        actions={<Button variant="outlined" startIcon={<DownloadIcon />} onClick={exportCsv}>Export CSV</Button>}
-      />
+      <PageHeader title="Reports" subtitle="Daily, weekly and monthly aggregates"
+        actions={<Button variant="outlined" startIcon={<DownloadIcon />} onClick={exportCsv}>Export CSV</Button>} />
 
       <Card sx={{ mb: 2 }}>
-        <Tabs
-          value={period}
-          onChange={(_, v) => setPeriod(v)}
-          indicatorColor="primary"
-          textColor="primary"
-        >
+        <Tabs value={period} onChange={(_, v) => setPeriod(v)} indicatorColor="primary" textColor="primary">
           {PERIODS.map((p) => <Tab key={p.key} value={p.key} label={p.label} />)}
         </Tabs>
       </Card>
@@ -83,7 +70,6 @@ export default function Reports() {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>Activity Trend</Typography>
-          {/* Lightweight in-house bar chart — avoids extra dependencies. */}
           <MiniBarChart series={series} />
         </CardContent>
       </Card>
@@ -118,7 +104,6 @@ export default function Reports() {
   );
 }
 
-/** Simple CSS bar chart that scales to the largest amount in the series. */
 function MiniBarChart({ series }) {
   const max = Math.max(1, ...series.map((s) => s.amount));
   return (
@@ -127,14 +112,8 @@ function MiniBarChart({ series }) {
         const h = (s.amount / max) * 100;
         return (
           <Box key={s.label} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, minWidth: 40 }}>
-            <Box
-              title={`${s.label}: ${formatCurrency(s.amount)}`}
-              sx={{
-                width: '100%', height: `${Math.max(4, h)}%`,
-                bgcolor: 'primary.main', borderRadius: 1, opacity: 0.85,
-                transition: 'all 0.3s ease',
-              }}
-            />
+            <Box title={`${s.label}: ${formatCurrency(s.amount)}`}
+              sx={{ width: '100%', height: `${Math.max(4, h)}%`, bgcolor: 'primary.main', borderRadius: 1, opacity: 0.85, transition: 'all 0.3s ease' }} />
             <Typography variant="caption" sx={{ fontSize: 10, color: 'text.secondary', textAlign: 'center' }}>
               {s.label}
             </Typography>

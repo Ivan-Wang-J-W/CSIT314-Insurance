@@ -254,6 +254,7 @@ CREATE TABLE notifications (
     message     TEXT                NOT NULL,
     notif_type  notification_type   NOT NULL DEFAULT 'info',
     read        BOOLEAN             NOT NULL DEFAULT FALSE,
+    link        TEXT,
     created_at  TIMESTAMPTZ         NOT NULL DEFAULT NOW()
 );
 

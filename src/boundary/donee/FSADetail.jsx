@@ -2,9 +2,9 @@
  * FSADetail — publicly accessible detail page for a single FSA.
  * Donees can donate & favourite; other roles see a read-only view.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, CardMedia, Chip, Dialog, DialogActions, DialogContent,
+  Alert, Avatar, Box, Button, Card, CardContent, CardMedia, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, Grid, IconButton, LinearProgress, Stack, TextField, Typography, FormControlLabel, Checkbox,
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -17,9 +17,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FSAController } from '../../control/FSAController.js';
 import { DonationController } from '../../control/DonationController.js';
 import { FavoriteController } from '../../control/FavoriteController.js';
-import { CategoryController } from '../../control/CategoryController.js';
-import { UserController } from '../../control/UserController.js';
-import { NotificationController } from '../../control/NotificationController.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { formatCurrency, formatDate, timeAgo } from '../../utils/formatters.js';
@@ -32,31 +29,40 @@ export default function FSADetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
-  const [version, setVersion] = useState(0);
+  const [fsa, setFsa] = useState(null);
+  const [donations, setDonations] = useState([]);
+  const [favorited, setFavorited] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
+  const [version, setVersion] = useState(0);
 
-  // Record a view once per mount so FR analytics reflect traffic.
-  useEffect(() => { FSAController.incrementViews(id); }, [id]);
+  useEffect(() => {
+    FSAController.getById(id).then(setFsa).catch(() => setFsa(null));
+    DonationController.forFSA(id).then(setDonations).catch(() => setDonations([]));
+  }, [id, version]);
 
-  const fsa = useMemo(() => FSAController.getById(id), [id, version]);
-  const donations = useMemo(() => fsa ? DonationController.forFSA(fsa.id) : [], [fsa, version]);
-  const fundraiser = fsa ? UserController.getById(fsa.fundraiserId) : null;
-  const category = fsa ? CategoryController.getById(fsa.categoryId) : null;
+  useEffect(() => {
+    if (user?.role === ROLES.DONEE) {
+      FavoriteController.isFavorited(user.id, id).then(setFavorited).catch(() => {});
+    }
+  }, [user, id, version]);
+
+  if (!fsa) return <EmptyState title="FSA not found" subtitle="This campaign may have been removed or still loading." />;
+
   const isDonee = user?.role === ROLES.DONEE;
-  const favorited = isDonee && fsa ? FavoriteController.isFavorited(user.id, fsa.id) : false;
-
-  if (!fsa) return <EmptyState title="FSA not found" subtitle="This campaign may have been removed." />;
-
   const progress = Math.min(100, Math.round((fsa.raisedAmount / fsa.goalAmount) * 100));
 
-  const handleToggleFavorite = () => {
+  const handleToggleFavorite = async () => {
     if (!isDonee) {
       toast.info('Only Donees can save FSAs to favourites');
       return;
     }
-    const now = FavoriteController.toggle(user.id, fsa.id);
-    toast.success(now ? 'Saved to favourites' : 'Removed from favourites');
-    setVersion((v) => v + 1);
+    try {
+      const now = await FavoriteController.toggle(user.id, fsa.id);
+      toast.success(now ? 'Saved to favourites' : 'Removed from favourites');
+      setVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   return (
@@ -71,7 +77,7 @@ export default function FSADetail() {
             )}
             <CardContent>
               <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-                {category && <Chip label={category.name} size="small" />}
+                {fsa.categoryId && <Chip label={fsa.categoryId} size="small" />}
                 <Chip label={fsa.status} color="primary" size="small" />
               </Stack>
               <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>{fsa.title}</Typography>
@@ -81,10 +87,7 @@ export default function FSADetail() {
                   <Typography variant="body2">{fsa.location}</Typography>
                 </Stack>
               )}
-              <Typography variant="body1" sx={{ mb: 3, whiteSpace: 'pre-wrap' }}>
-                {fsa.description}
-              </Typography>
-
+              <Typography variant="body1" sx={{ mb: 3, whiteSpace: 'pre-wrap' }}>{fsa.description}</Typography>
               <Divider sx={{ my: 2 }} />
               <Stack direction="row" spacing={3} color="text.secondary" sx={{ flexWrap: 'wrap' }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -125,32 +128,15 @@ export default function FSADetail() {
                       const initials = d.anonymous ? '?' : label.charAt(0);
                       const hue = Math.abs(d.id.split('').reduce((h, c) => h + c.charCodeAt(0), 0)) % 360;
                       return (
-                        <Stack
-                          key={d.id}
-                          direction="row"
-                          spacing={2}
-                          alignItems="flex-start"
-                          sx={{
-                            py: 1.75,
-                            borderBottom: idx < arr.length - 1 ? '1px solid' : 'none',
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Avatar
-                            sx={{
-                              width: 40, height: 40, fontSize: 15, fontWeight: 700, flexShrink: 0,
-                              bgcolor: `hsl(${hue}, 55%, 45%)`,
-                            }}
-                          >
+                        <Stack key={d.id} direction="row" spacing={2} alignItems="flex-start"
+                          sx={{ py: 1.75, borderBottom: idx < arr.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+                          <Avatar sx={{ width: 40, height: 40, fontSize: 15, fontWeight: 700, flexShrink: 0, bgcolor: `hsl(${hue}, 55%, 45%)` }}>
                             {initials}
                           </Avatar>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" fontWeight={600}>{label}</Typography>
                             {d.message && (
-                              <Typography
-                                variant="caption" color="text.secondary"
-                                sx={{ display: 'block', mt: 0.25, fontStyle: 'italic' }}
-                              >
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontStyle: 'italic' }}>
                                 "{d.message}"
                               </Typography>
                             )}
@@ -176,16 +162,9 @@ export default function FSADetail() {
               <Typography color="text.secondary" sx={{ mb: 2 }}>
                 raised of {formatCurrency(fsa.goalAmount)} goal ({progress}%)
               </Typography>
-
               {fsa.status === FSA_STATUS.ACTIVE ? (
                 <Stack spacing={1}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    fullWidth
-                    disabled={!isDonee}
-                    onClick={() => setDonateOpen(true)}
-                  >
+                  <Button variant="contained" size="large" fullWidth disabled={!isDonee} onClick={() => setDonateOpen(true)}>
                     Donate Now
                   </Button>
                   {!isDonee && user && (
@@ -204,13 +183,10 @@ export default function FSADetail() {
               ) : (
                 <Alert severity="info">This campaign is no longer accepting donations.</Alert>
               )}
-
               <Divider sx={{ my: 3 }} />
               <Typography variant="overline" color="text.secondary">Organiser</Typography>
-              <Typography>{fundraiser?.fullName || fundraiser?.username || 'Unknown'}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Ends {formatDate(fsa.endDate)}
-              </Typography>
+              <Typography>{fsa.fundraiserId}</Typography>
+              <Typography variant="caption" color="text.secondary">Ends {formatDate(fsa.endDate)}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -226,7 +202,6 @@ export default function FSADetail() {
   );
 }
 
-/** Modal donation form — kept local since it's only used here. */
 function DonateDialog({ open, onClose, fsa, onSuccess }) {
   const { user } = useAuth();
   const toast = useToast();
@@ -236,21 +211,13 @@ function DonateDialog({ open, onClose, fsa, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
     const n = Number(amount);
     if (!n || n <= 0) { setError('Enter a donation amount greater than zero'); return; }
     setSubmitting(true);
     try {
-      DonationController.create({
-        fsaId: fsa.id, doneeId: user.id, amount: n, message, anonymous,
-      });
-      NotificationController.push({
-        userId: fsa.fundraiserId,
-        title: 'New donation received',
-        message: `You received ${formatCurrency(n)} on "${fsa.title}"`,
-        type: 'success',
-      });
+      await DonationController.create({ fsaId: fsa.id, doneeId: user.id, amount: n, message, anonymous });
       toast.success(`Thanks for donating ${formatCurrency(n)}!`);
       onSuccess?.();
       onClose();

@@ -1,11 +1,12 @@
 """
-Auth routes — G-07 (register), G-09 (login), logout.
+Auth routes — G-07 (register), G-09 (login), logout, profile.
 BCE layer: Boundary
 """
 
 from flask import Blueprint, request, jsonify, g
 
 import control.auth_controller as auth_ctrl
+import control.user_controller as user_ctrl
 from boundary.utils import require_auth
 
 auth_bp = Blueprint("auth", __name__)
@@ -49,3 +50,15 @@ def logout():
 def me():
     return jsonify({"user": {k: v for k, v in g.current_user.items()
                              if k != "password_hash"}}), 200
+
+
+@auth_bp.put("/me")
+@require_auth
+def update_me():
+    """Self-service profile update (full_name, email)."""
+    data = request.get_json() or {}
+    try:
+        user = user_ctrl.update_user(g.current_user["id"], data)
+        return jsonify({"user": user}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400

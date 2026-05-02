@@ -1,5 +1,6 @@
 """Flask application factory."""
 
+import os
 from flask import Flask
 from flask_cors import CORS
 
@@ -11,11 +12,14 @@ from boundary.report_routes import report_bp
 from boundary.assessor_routes import assessor_bp
 from boundary.compliance_routes import compliance_bp
 from boundary.config_routes import config_bp
+from boundary.upload_routes import upload_bp
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "dev-secret-change-in-production"
+    app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
+    app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB limit
     CORS(app)
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
@@ -26,6 +30,7 @@ def create_app() -> Flask:
     app.register_blueprint(assessor_bp, url_prefix="/api/assessor")
     app.register_blueprint(compliance_bp, url_prefix="/api/compliance")
     app.register_blueprint(config_bp, url_prefix="/api/admin")
+    app.register_blueprint(upload_bp, url_prefix="/api/uploads")
 
     return app
 

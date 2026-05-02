@@ -1,5 +1,5 @@
 /** Per-FSA analytics for a fundraiser: views, shortlists, and donation breakdown. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Card, CardContent, Chip, Grid, LinearProgress, MenuItem, Stack, Table, TableBody,
   TableCell, TableHead, TableRow, TextField, Typography,
@@ -13,17 +13,32 @@ import EmptyState from '../common/EmptyState.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { FSAController } from '../../control/FSAController.js';
 import { DonationController } from '../../control/DonationController.js';
-import { CategoryController } from '../../control/CategoryController.js';
 import { formatCurrency, formatDateTime } from '../../utils/formatters.js';
 
 export default function FSAAnalytics() {
   const { user } = useAuth();
-  const myFSAs = useMemo(() => FSAController.analyticsFor(user.id).items, [user.id]);
-  const [selectedId, setSelectedId] = useState(myFSAs[0]?.id || '');
+  const [myFSAs, setMyFSAs] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [donations, setDonations] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+    FSAController.analyticsFor(user.id)
+      .then((analytics) => {
+        const items = analytics.items || [];
+        setMyFSAs(items);
+        if (items.length > 0) setSelectedId(items[0].id);
+      })
+      .catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    DonationController.forFSA(selectedId).then(setDonations).catch(() => setDonations([]));
+  }, [selectedId]);
 
   const selected = myFSAs.find((f) => f.id === selectedId);
-  const donations = selected ? DonationController.forFSA(selected.id) : [];
-  const category = selected ? CategoryController.getById(selected.categoryId) : null;
+  const categoryName = selected?.categoryId || '';
 
   if (myFSAs.length === 0) {
     return (
@@ -56,7 +71,7 @@ export default function FSAAnalytics() {
             <CardContent>
               <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
                 <Typography variant="h5" fontWeight={700}>{selected.title}</Typography>
-                {category && <Chip label={category.name} size="small" />}
+                {categoryName && <Chip label={categoryName} size="small" />}
                 <Chip label={selected.status} size="small" color="primary" />
               </Stack>
               <Typography color="text.secondary" sx={{ mb: 2 }}>{selected.description}</Typography>

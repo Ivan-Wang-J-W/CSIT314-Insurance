@@ -107,7 +107,7 @@ class TestSystemMetrics:
         resp = client.get("/api/reports/metrics", headers=headers)
         assert resp.status_code == 200
 
-    def test_metrics_forbidden_for_platform_manager(self, client, platform_manager_user, auth_headers):
+    def test_metrics_accessible_for_platform_manager(self, client, platform_manager_user, auth_headers):
         headers = auth_headers("pm")
         resp = client.get("/api/reports/metrics", headers=headers)
-        assert resp.status_code == 403
+        assert resp.status_code == 200
