@@ -9,6 +9,8 @@ export const ROLES = Object.freeze({
   FUNDRAISER: 'FUNDRAISER',
   DONEE: 'DONEE',
   PLATFORM_MANAGER: 'PLATFORM_MANAGER',
+  ASSESSOR: 'ASSESSOR',
+  COMPLIANCE: 'COMPLIANCE',
 });
 
 export const ROLE_LABELS = {
@@ -16,6 +18,8 @@ export const ROLE_LABELS = {
   [ROLES.FUNDRAISER]: 'Fundraiser',
   [ROLES.DONEE]: 'Donee',
   [ROLES.PLATFORM_MANAGER]: 'Platform Manager',
+  [ROLES.ASSESSOR]: 'Assessor',
+  [ROLES.COMPLIANCE]: 'Compliance Officer',
 };
 
 export class User {

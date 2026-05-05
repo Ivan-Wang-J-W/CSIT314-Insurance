@@ -14,6 +14,7 @@ export function campaignToFSA(c) {
     fundraiserId: c.fundraiser_id,
     views: c.views || 0,
     shortlisted: c.shortlisted || 0,
+    withdrawalHeld: c.withdrawal_held || false,
     createdAt: c.created_at,
   };
 }

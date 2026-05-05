@@ -17,6 +17,8 @@ const HOME_BY_ROLE = {
   [ROLES.FUNDRAISER]: '/fundraiser',
   [ROLES.DONEE]: '/donee',
   [ROLES.PLATFORM_MANAGER]: '/platform',
+  [ROLES.ASSESSOR]: '/assessor',
+  [ROLES.COMPLIANCE]: '/compliance',
 };
 
 const DEMO_ACCOUNTS = [

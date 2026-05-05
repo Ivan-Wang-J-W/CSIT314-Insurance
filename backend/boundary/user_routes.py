@@ -41,7 +41,7 @@ def list_users():
 
 
 @user_bp.get("/<user_id>")
-@require_role("ADMIN")
+@require_role("ADMIN", "COMPLIANCE", "ASSESSOR")
 def get_user(user_id):
     try:
         return jsonify({"user": user_ctrl.get_user(user_id)}), 200

@@ -2,6 +2,17 @@ import { api } from '../utils/api.js';
 import { backendToUser, userToPayload } from '../utils/mappers.js';
 
 export const UserController = {
+  async create({ fullName, email, username, password, role }) {
+    const data = await api.post('/admin/users/', {
+      full_name: fullName,
+      email,
+      username,
+      password,
+      role,
+    });
+    return backendToUser(data.user);
+  },
+
   async search({ q, role, status, page = 1, pageSize = 10 } = {}) {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
@@ -9,7 +20,7 @@ export const UserController = {
     if (status) params.set('status', status);
     params.set('page', page);
     params.set('page_size', pageSize);
-    const data = await api.get(`/admin/users?${params}`);
+    const data = await api.get(`/admin/users/?${params}`);
     return {
       items: (data.users || []).map(backendToUser),
       total: data.total || 0,

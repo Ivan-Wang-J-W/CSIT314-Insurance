@@ -46,6 +46,12 @@ import CategoryManagement from './boundary/platform/CategoryManagement.jsx';
 import CampaignReview from './boundary/platform/CampaignReview.jsx';
 import Reports from './boundary/platform/Reports.jsx';
 
+// Assessor
+import AssessorDashboard from './boundary/assessor/AssessorDashboard.jsx';
+
+// Compliance
+import ComplianceDashboard from './boundary/compliance/ComplianceDashboard.jsx';
+
 // Shared pages
 import LandingPage from './boundary/common/LandingPage.jsx';
 import ProfilePage from './boundary/common/ProfilePage.jsx';
@@ -63,6 +69,8 @@ function RootPage() {
     [ROLES.FUNDRAISER]: '/fundraiser',
     [ROLES.DONEE]: '/donee',
     [ROLES.PLATFORM_MANAGER]: '/platform',
+    [ROLES.ASSESSOR]: '/assessor',
+    [ROLES.COMPLIANCE]: '/compliance',
   }[user.role] || '/login';
   return <Navigate to={home} replace />;
 }
@@ -138,6 +146,16 @@ export default function App() {
                 } />
                 <Route path="/platform/reports" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><Reports /></ProtectedRoute>
+                } />
+
+                {/* Assessor */}
+                <Route path="/assessor" element={
+                  <ProtectedRoute roles={[ROLES.ASSESSOR]}><AssessorDashboard /></ProtectedRoute>
+                } />
+
+                {/* Compliance */}
+                <Route path="/compliance" element={
+                  <ProtectedRoute roles={[ROLES.COMPLIANCE]}><ComplianceDashboard /></ProtectedRoute>
                 } />
 
                 {/* Shared: any signed-in user can open an FSA detail or their profile */}
