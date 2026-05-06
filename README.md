@@ -4,7 +4,72 @@ A React.js frontend for an online fundraising platform (CSIT314 group project), 
 
 ---
 
-## Quick start
+## Local Startup Commands
+
+Install dependencies:
+
+```powershell
+npm install
+cd backend
+pip install -r requirements.txt
+cd ..
+```
+
+Create the PostgreSQL database and load the schema:
+
+```powershell
+$env:PGPASSWORD='admin123'
+createdb -U postgres frwa
+psql -U postgres -d frwa -f "backend\data\314 db.sql"
+```
+
+Load dummy data:
+
+```powershell
+$env:PGPASSWORD='admin123'
+psql -U postgres -d frwa -f "backend\data\seed_dummy_data.sql"
+```
+
+Start the backend in one terminal:
+
+```powershell
+cd backend
+$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
+python app.py
+```
+
+Start the frontend in another terminal:
+
+```powershell
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+Dummy logins:
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Admin | `admin` | `admin123` |
+| Platform Manager | `pm` | `password` |
+| Assessor | `assessor` | `password` |
+| Compliance | `compliance` | `password` |
+| Fundraiser | `fr1` / `fr2` | `password` |
+| Donee | `donee1` / `donee2` / `donee3` | `password` |
+
+Backend tests:
+
+```powershell
+cd backend
+$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
+python -m pytest
+```
+
+---
+
+## Legacy Browser-Only Notes
+
+These older notes describe the original frontend-only demo mode. Use the local startup commands above for the current Flask/PostgreSQL app.
 
 ```bash
 npm install

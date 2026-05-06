@@ -13,6 +13,32 @@ python app.py        # API runs on http://localhost:5000
 pytest               # run all unit tests
 ```
 
+### Local PostgreSQL Setup
+
+From the repo root, create the database and load the schema:
+
+```powershell
+$env:PGPASSWORD='admin123'
+createdb -U postgres frwa
+psql -U postgres -d frwa -f "backend\data\314 db.sql"
+psql -U postgres -d frwa -f "backend\data\seed_dummy_data.sql"
+```
+
+Start the backend with the local database URL:
+
+```powershell
+cd backend
+$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
+python app.py
+```
+
+Run backend tests with the same database URL:
+
+```powershell
+$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
+python -m pytest
+```
+
 ---
 
 ## Architecture
