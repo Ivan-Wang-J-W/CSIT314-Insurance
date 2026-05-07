@@ -206,7 +206,7 @@ def update_campaign(campaign_id: str, patch: dict) -> dict | None:
         return get_campaign_by_id(campaign_id)
     allowed = {"title", "description", "category", "goal_amount", "raised_amount",
                "image_url", "start_date", "end_date", "status", "urgency_tier",
-               "rejection_remarks", "withdrawal_held"}
+               "rejection_remarks", "withdrawal_held", "withdrawal_limit"}
     safe = {k: v for k, v in patch.items() if k in allowed}
     if not safe:
         return get_campaign_by_id(campaign_id)
@@ -258,6 +258,13 @@ def get_donations_by_donee(donee_id: str) -> list:
             return _rows(cur.fetchall())
 
 
+def get_donation_by_id(donation_id: str) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM donations WHERE id = %s", (donation_id,))
+            return _row(cur.fetchone())
+
+
 def create_donation(data: dict) -> dict:
     did = _new_id()
     with _db() as conn:
@@ -274,6 +281,70 @@ def create_donation(data: dict) -> dict:
                 data.get("message", ""),
                 data.get("anonymous", False),
             ))
+            return _row(cur.fetchone())
+
+
+# ---------------------------------------------------------------------------
+# Refund operations
+# ---------------------------------------------------------------------------
+
+def get_all_refunds() -> list:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM refunds ORDER BY created_at DESC")
+            return _rows(cur.fetchall())
+
+
+def get_refunds_by_status(status: str) -> list:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM refunds WHERE status = %s ORDER BY created_at DESC",
+                (status,),
+            )
+            return _rows(cur.fetchall())
+
+
+def get_refund_by_id(refund_id: str) -> dict | None:
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM refunds WHERE id = %s", (refund_id,))
+            return _row(cur.fetchone())
+
+
+def create_refund(data: dict) -> dict:
+    rid = _new_id()
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO refunds (id, donation_id, donee_id, reason, amount, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING *
+            """, (
+                rid,
+                data["donation_id"],
+                data["donee_id"],
+                data["reason"],
+                float(data["amount"]),
+                data.get("status", "PENDING"),
+            ))
+            return _row(cur.fetchone())
+
+
+def update_refund(refund_id: str, patch: dict) -> dict | None:
+    if not patch:
+        return get_refund_by_id(refund_id)
+    allowed = {"status", "reviewed_by", "reviewed_at"}
+    safe = {k: v for k, v in patch.items() if k in allowed}
+    if not safe:
+        return get_refund_by_id(refund_id)
+    sets = ", ".join(f"{k} = %s" for k in safe)
+    vals = list(safe.values()) + [refund_id]
+    with _db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE refunds SET {sets} WHERE id = %s RETURNING *", vals
+            )
             return _row(cur.fetchone())
 
 
