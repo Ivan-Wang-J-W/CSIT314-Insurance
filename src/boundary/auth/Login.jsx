@@ -26,6 +26,8 @@ const DEMO_ACCOUNTS = [
   { label: 'Fundraiser', username: 'fr1', password: 'password' },
   { label: 'Donee', username: 'dn1', password: 'password' },
   { label: 'Platform Manager', username: 'pm', password: 'pm123' },
+  { label: 'Assessor', username: 'assessor', password: 'ar345' },
+  { label: 'Compliance', username: 'compce', password: 'ce567' },
 ];
 
 export default function Login() {

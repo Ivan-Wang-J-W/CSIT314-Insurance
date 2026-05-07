@@ -120,6 +120,7 @@ CREATE TABLE campaigns (
     urgency_tier        urgency_tier    NOT NULL DEFAULT 'LOW',
     rejection_remarks   TEXT            NOT NULL DEFAULT '',
     withdrawal_held     BOOLEAN         NOT NULL DEFAULT FALSE,
+    withdrawal_limit    NUMERIC(12, 2),
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
@@ -147,6 +148,29 @@ CREATE TABLE donations (
 CREATE INDEX idx_donations_campaign_id  ON donations(campaign_id);
 CREATE INDEX idx_donations_donee_id     ON donations(donee_id);
 CREATE INDEX idx_donations_created_at   ON donations(created_at);
+
+-- =============================================================================
+-- TABLE: refunds
+-- Source: control/compliance_controller.py, store.py
+-- User stories: CO-03 (approve/reject refund requests)
+-- =============================================================================
+
+CREATE TABLE refunds (
+    id              VARCHAR(8)      PRIMARY KEY DEFAULT substr(gen_random_uuid()::text, 1, 8),
+    donation_id     VARCHAR(8)      NOT NULL UNIQUE REFERENCES donations(id) ON DELETE CASCADE,
+    donee_id        VARCHAR(8)      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason          TEXT            NOT NULL,
+    amount          NUMERIC(12, 2)  NOT NULL CHECK (amount > 0),
+    status          VARCHAR(32)     NOT NULL DEFAULT 'PENDING',
+    reviewed_by     VARCHAR(8)      REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    reviewed_at     TIMESTAMPTZ
+);
+
+CREATE INDEX idx_refunds_donation_id    ON refunds(donation_id);
+CREATE INDEX idx_refunds_donee_id       ON refunds(donee_id);
+CREATE INDEX idx_refunds_status         ON refunds(status);
+CREATE INDEX idx_refunds_created_at     ON refunds(created_at);
 
 -- =============================================================================
 -- TABLE: milestones

@@ -1,35 +1,47 @@
-/** Compliance dashboard — review fraud reports, escalate campaigns, check identity status. */
+/** Compliance dashboard — review fraud reports, escalate campaigns, check identity status, manage refunds, set withdrawal limits. */
 import { useEffect, useMemo, useState } from 'react';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead,
-  TableRow, TextField, Typography,
+  TableRow, TextField, Typography, Tab, Tabs,
 } from '@mui/material';
 import GavelIcon from '@mui/icons-material/Gavel';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import BlockIcon from '@mui/icons-material/Block';
 import PageHeader from '../common/PageHeader.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { FSAController } from '../../control/FSAController.js';
 import { api } from '../../utils/api.js';
-import { formatDate, formatDateTime } from '../../utils/formatters.js';
+import { formatDate, formatDateTime, formatCurrency } from '../../utils/formatters.js';
 
 const STATUS_COLOR = { PENDING: 'warning', REVIEWED: 'success', ESCALATED: 'error', CLOSED: 'default' };
+const REFUND_STATUS_COLOR = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'error' };
 const ID_STATUS_COLOR = { VERIFIED: 'success', PENDING: 'default' };
 const FILTER_OPTIONS = ['All', 'PENDING', 'REVIEWED', 'ESCALATED'];
 
 const EMPTY_ID_DIALOG = { open: false, campaignId: null, campaignTitle: '', data: null, loading: false };
 const EMPTY_ESC_DIALOG = { open: false, campaignId: null, campaignTitle: '' };
+const EMPTY_REFUND_DIALOG = { open: false, donationId: null, donationAmount: null, reason: '' };
+const EMPTY_WITHDRAWAL_DIALOG = { open: false, campaignId: null, campaignTitle: '', limit: '' };
 
 export default function ComplianceDashboard() {
   const toast = useToast();
+  const { currentUser } = useAuth();
+  const [tab, setTab] = useState(0);
   const [reports, setReports] = useState([]);
+  const [refunds, setRefunds] = useState([]);
   const [campaignMap, setCampaignMap] = useState({});
   const [userMap, setUserMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [refundFilter, setRefundFilter] = useState('All');
   const [idDialog, setIdDialog] = useState(EMPTY_ID_DIALOG);
   const [escDialog, setEscDialog] = useState(EMPTY_ESC_DIALOG);
+  const [refundDialog, setRefundDialog] = useState(EMPTY_REFUND_DIALOG);
+  const [withdrawalDialog, setWithdrawalDialog] = useState(EMPTY_WITHDRAWAL_DIALOG);
   const [notes, setNotes] = useState('');
 
   const load = async () => {
@@ -38,6 +50,10 @@ export default function ComplianceDashboard() {
       const data = await api.get('/compliance/fraud-reports');
       const rpts = data.fraud_reports || [];
       setReports(rpts);
+
+      // Fetch refunds
+      const refundData = await api.get('/compliance/refunds').catch(() => ({ refunds: [] }));
+      setRefunds(refundData.refunds || []);
 
       // Fetch campaign titles
       const uniqueCampaignIds = [...new Set(rpts.map((r) => r.campaign_id))];
@@ -97,32 +113,78 @@ export default function ComplianceDashboard() {
     }
   };
 
+  const handleApproveRefund = async (refundId) => {
+    try {
+      await api.post(`/compliance/refunds/${refundId}/approve`, {});
+      toast.success('Refund approved');
+      load();
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleRejectRefund = async (refundId) => {
+    try {
+      await api.post(`/compliance/refunds/${refundId}/reject`, {});
+      toast.success('Refund rejected');
+      load();
+    } catch (err) { toast.error(err.message); }
+  };
+
+  const handleSetWithdrawalLimit = async () => {
+    try {
+      await api.post(`/compliance/campaigns/${withdrawalDialog.campaignId}/withdrawal-limit`, {
+        limit: parseFloat(withdrawalDialog.limit) || 0,
+      });
+      toast.success('Withdrawal limit set successfully');
+      setWithdrawalDialog(EMPTY_WITHDRAWAL_DIALOG);
+      load();
+    } catch (err) { toast.error(err.message); }
+  };
+
   const pendingCount = reports.filter((r) => r.status === 'PENDING').length;
+  const pendingRefundCount = refunds.filter((r) => r.status === 'PENDING').length;
+
+  const filteredRefunds = useMemo(() => {
+    if (refundFilter === 'All') return refunds;
+    return refunds.filter((r) => r.status === refundFilter);
+  }, [refunds, refundFilter]);
 
   return (
     <>
       <PageHeader
         title="Compliance Dashboard"
         subtitle={
-          pendingCount > 0
-            ? `${pendingCount} pending report${pendingCount !== 1 ? 's' : ''} require attention`
-            : 'Review fraud reports and escalate high-risk campaigns'
+          tab === 0 && pendingCount > 0
+            ? `${pendingCount} pending fraud report${pendingCount !== 1 ? 's' : ''} require attention`
+            : tab === 1 && pendingRefundCount > 0
+              ? `${pendingRefundCount} pending refund request${pendingRefundCount !== 1 ? 's' : ''} to review`
+              : 'Manage fraud reports, refunds, and withdrawal limits'
         }
       />
 
-      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-        <TextField
-          select size="small" label="Status" value={filter}
-          onChange={(e) => setFilter(e.target.value)} sx={{ minWidth: 160 }}
-        >
-          {FILTER_OPTIONS.map((o) => (
-            <MenuItem key={o} value={o}>{o === 'All' ? 'All Statuses' : o}</MenuItem>
-          ))}
-        </TextField>
-        <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
-          {filtered.length} report{filtered.length !== 1 ? 's' : ''}
-        </Typography>
-      </Stack>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+          <Tab label="Fraud Reports" />
+          <Tab label="Refunds" icon={<MonetizationOnIcon />} />
+          <Tab label="Withdrawal Limits" icon={<BlockIcon />} />
+        </Tabs>
+      </Box>
+
+      {/* ===== TAB 0: FRAUD REPORTS ===== */}
+      {tab === 0 && (
+        <>
+          <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+            <TextField
+              select size="small" label="Status" value={filter}
+              onChange={(e) => setFilter(e.target.value)} sx={{ minWidth: 160 }}
+            >
+              {FILTER_OPTIONS.map((o) => (
+                <MenuItem key={o} value={o}>{o === 'All' ? 'All Statuses' : o}</MenuItem>
+              ))}
+            </TextField>
+            <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
+              {filtered.length} report{filtered.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
 
       <Paper variant="outlined">
         <Table size="small">
@@ -197,6 +259,108 @@ export default function ComplianceDashboard() {
           </TableBody>
         </Table>
       </Paper>
+        </>
+      )}
+
+      {/* ===== TAB 1: REFUNDS ===== */}
+      {tab === 1 && (
+        <>
+          <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+            <TextField
+              select size="small" label="Status" value={refundFilter}
+              onChange={(e) => setRefundFilter(e.target.value)} sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="All">All Statuses</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
+              <MenuItem value="APPROVED">Approved</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+            </TextField>
+            <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
+              {filteredRefunds.length} refund{filteredRefunds.length !== 1 ? 's' : ''}
+            </Typography>
+          </Stack>
+
+          <Paper variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell><strong>Donation Amount</strong></TableCell>
+                  <TableCell><strong>Reason</strong></TableCell>
+                  <TableCell><strong>Date</strong></TableCell>
+                  <TableCell><strong>Status</strong></TableCell>
+                  <TableCell align="right"><strong>Actions</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>Loading…</TableCell>
+                  </TableRow>
+                )}
+                {!loading && filteredRefunds.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>No refund requests found.</TableCell>
+                  </TableRow>
+                )}
+                {filteredRefunds.map((r) => (
+                  <TableRow key={r.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>{formatCurrency(r.amount)}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 250 }}>{r.reason}</Typography>
+                    </TableCell>
+                    <TableCell>{formatDate(r.created_at)}</TableCell>
+                    <TableCell>
+                      <Chip label={r.status} size="small" color={REFUND_STATUS_COLOR[r.status] || 'default'} />
+                    </TableCell>
+                    <TableCell align="right">
+                      {currentUser.role === 'COMPLIANCE' || currentUser.role === 'ADMIN' ? (
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                          {r.status === 'PENDING' && (
+                            <>
+                              <Button size="small" color="success" onClick={() => handleApproveRefund(r.id)}>
+                                Approve
+                              </Button>
+                              <Button size="small" color="error" onClick={() => handleRejectRefund(r.id)}>
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                        </Stack>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">—</Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Paper>
+        </>
+      )}
+
+      {/* ===== TAB 2: WITHDRAWAL LIMITS ===== */}
+      {tab === 2 && (
+        <>
+          <Box sx={{ mb: 3 }}>
+            <Button
+              variant="contained" color="primary" startIcon={<BlockIcon />}
+              onClick={() => setWithdrawalDialog({ open: true, campaignId: '', campaignTitle: '', limit: '' })}
+            >
+              Set Campaign Withdrawal Limit
+            </Button>
+          </Box>
+
+          <Paper variant="outlined" sx={{ p: 3, bgcolor: 'info.lighter' }}>
+            <Typography variant="h6" gutterBottom>Campaign Withdrawal Limits</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Use this feature to set maximum withdrawal amounts for campaigns under investigation.
+              This prevents fundraisers from withdrawing large amounts while compliance is ongoing.
+            </Typography>
+          </Paper>
+        </>
+      )}
 
       {/* Identity Status Dialog */}
       <Dialog open={idDialog.open} onClose={() => setIdDialog(EMPTY_ID_DIALOG)} maxWidth="sm" fullWidth>
@@ -277,6 +441,34 @@ export default function ComplianceDashboard() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setEscDialog(EMPTY_ESC_DIALOG)} variant="outlined">Cancel</Button>
           <Button onClick={handleEscalate} color="error" variant="contained">Escalate</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Withdrawal Limit Dialog */}
+      <Dialog open={withdrawalDialog.open} onClose={() => setWithdrawalDialog(EMPTY_WITHDRAWAL_DIALOG)} maxWidth="sm" fullWidth>
+        <DialogTitle>Set Campaign Withdrawal Limit</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 2 }}>
+            <TextField
+              label="Campaign ID" value={withdrawalDialog.campaignId}
+              onChange={(e) => setWithdrawalDialog(prev => ({ ...prev, campaignId: e.target.value }))}
+              placeholder="Enter campaign ID"
+            />
+            <TextField
+              label="Maximum Withdrawal Amount" type="number" inputProps={{ step: '0.01', min: '0' }}
+              value={withdrawalDialog.limit}
+              onChange={(e) => setWithdrawalDialog(prev => ({ ...prev, limit: e.target.value }))}
+              placeholder="e.g., 10000"
+            />
+            <Typography variant="caption" color="text.secondary">
+              Set the maximum amount the fundraiser can withdraw from this campaign during investigation.
+              Leave blank or set to 0 to remove the limit.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setWithdrawalDialog(EMPTY_WITHDRAWAL_DIALOG)} variant="outlined">Cancel</Button>
+          <Button onClick={handleSetWithdrawalLimit} color="primary" variant="contained">Set Limit</Button>
         </DialogActions>
       </Dialog>
     </>
