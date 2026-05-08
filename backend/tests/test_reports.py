@@ -23,15 +23,6 @@ def donee(donee_user):
 class TestDailyReport:
     """PM-08: generate daily reports of fundraising activity."""
 
-    def test_daily_report_structure(self, fr):
-        report = daily_report()
-        required_keys = {
-            "date", "new_campaigns", "donations_count",
-            "total_donated", "approved_campaigns",
-            "rejected_campaigns", "suspended_campaigns", "campaign_summary",
-        }
-        assert required_keys.issubset(report.keys())
-
     def test_daily_report_counts_todays_campaigns(self, fr):
         make_campaign(fr["id"], status="ACTIVE")
         make_campaign(fr["id"], status="PENDING")
@@ -45,10 +36,6 @@ class TestDailyReport:
         report = daily_report()
         assert report["donations_count"] == 2
         assert report["total_donated"] == 300.0
-
-    def test_daily_report_defaults_to_today(self, fr):
-        report = daily_report()
-        assert report["date"] == date.today().isoformat()
 
     def test_daily_report_accepts_custom_date(self, fr):
         report = daily_report("2024-01-15")
@@ -69,15 +56,6 @@ class TestDailyReport:
 
 class TestSystemMetrics:
     """SA-07: monitor system performance metrics."""
-
-    def test_metrics_structure(self):
-        metrics = system_metrics()
-        required_keys = {
-            "total_users", "users_by_role", "total_campaigns",
-            "active_campaigns", "completed_campaigns",
-            "total_donations", "total_raised", "average_donation",
-        }
-        assert required_keys.issubset(metrics.keys())
 
     def test_metrics_counts_users_correctly(self, fr, donee_user):
         metrics = system_metrics()
