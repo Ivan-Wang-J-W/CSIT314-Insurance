@@ -9,3 +9,18 @@ dist-ssr
 .idea
 *.log
 coverage
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tool caches
+.cache/
+.vite/
+
+# Uploaded files
+backend/uploads/
