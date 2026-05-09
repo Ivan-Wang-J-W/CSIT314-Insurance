@@ -23,10 +23,15 @@ const STATUS_COLOR = {
   [FSA_STATUS.DRAFT]: 'default',
 };
 
+const URGENCY_BADGE = {
+  critical:      { label: 'Critical',      color: 'error' },
+  nearly_funded: { label: 'Nearly Funded', color: 'warning' },
+};
+
 export default function FSACard({
   fsa, linkTo,
   favorited = false, onToggleFavorite, showFavoriteButton = false,
-  showAnalytics = false,
+  showAnalytics = false, urgencyBucket,
 }) {
   const progress = Math.min(100, Math.round((fsa.raisedAmount / fsa.goalAmount) * 100));
   const category = CategoryController.getById(fsa.categoryId);
@@ -90,6 +95,13 @@ export default function FSACard({
               />
             )}
             <Chip size="small" label={fsa.status} color={STATUS_COLOR[fsa.status]} variant="outlined" />
+            {urgencyBucket && URGENCY_BADGE[urgencyBucket] && (
+              <Chip
+                size="small"
+                label={URGENCY_BADGE[urgencyBucket].label}
+                color={URGENCY_BADGE[urgencyBucket].color}
+              />
+            )}
           </Stack>
 
           <Typography variant="subtitle1" sx={{ mb: 0.5, lineHeight: 1.3, fontWeight: 600 }}>

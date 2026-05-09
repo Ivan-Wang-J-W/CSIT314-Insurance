@@ -33,16 +33,18 @@ def create_donation(campaign_id: str, donee_id: str, amount: float,
         "anonymous": anonymous,
     })
 
-    new_raised = campaign_data["raised_amount"] + float(amount)
+    old_raised = campaign_data["raised_amount"]
+    new_raised = old_raised + float(amount)
+    threshold = campaign_data["goal_amount"] * 0.9
+
     store.update_campaign(campaign_id, {"raised_amount": new_raised})
 
     if new_raised >= campaign_data["goal_amount"]:
         store.update_campaign(campaign_id, {"status": "COMPLETED"})
-
-    updated = store.get_campaign_by_id(campaign_id)
-    campaign_obj = Campaign.from_dict(updated)
-    if campaign_obj.is_within_10_percent_of_goal() and updated["status"] != "COMPLETED":
-        _notify_savers_near_goal(campaign_id, campaign_obj.title)
+    elif old_raised < threshold <= new_raised:
+        # crossed the 90% line for the first time with this donation
+        updated = store.get_campaign_by_id(campaign_id)
+        _notify_savers_near_goal(campaign_id, Campaign.from_dict(updated).title)
 
     return Donation.from_dict(donation).to_dict()
 
@@ -94,6 +96,18 @@ def toggle_favorite(donee_id: str, campaign_id: str) -> dict:
         store.delete_favorite(existing["id"])
         return {"saved": False, "campaign_id": campaign_id}
     store.create_favorite(donee_id, campaign_id)
+    # if the campaign is already near its goal, notify the saver immediately
+    c = store.get_campaign_by_id(campaign_id)
+    if c and c["status"] == "ACTIVE":
+        campaign = Campaign.from_dict(c)
+        if campaign.is_within_10_percent_of_goal():
+            push_notification(
+                user_id=donee_id,
+                title="Saved Campaign Near Goal",
+                message=f"'{campaign.title}' you just saved is already within 10% of its goal! Donate before it closes.",
+                notif_type="warning",
+                link=f"/fsa/{campaign_id}",
+            )
     return {"saved": True, "campaign_id": campaign_id}
 
 
@@ -117,6 +131,7 @@ def _notify_savers_near_goal(campaign_id: str, campaign_title: str) -> None:
         push_notification(
             user_id=fav["donee_id"],
             title="Campaign Near Goal",
-            message=f"'{campaign_title}' is within 10% of its fundraising goal!",
+            message=f"'{campaign_title}' is within 10% of its fundraising goal! Donate before it closes.",
             notif_type="warning",
+            link=f"/fsa/{campaign_id}",
         )

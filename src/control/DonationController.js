@@ -38,4 +38,9 @@ export const DonationController = {
       total: data.total || 0,
     };
   },
+
+  async goalAlerts() {
+    const data = await api.get('/donations/alerts');
+    return data.alerts || [];
+  },
 };

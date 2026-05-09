@@ -25,7 +25,12 @@ export default function NotificationBell() {
     }
   };
 
-  useEffect(() => { if (user) refresh(); }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   if (!user) return null;
   const unread = items.filter((n) => !n.read).length;

@@ -53,6 +53,14 @@ export const FSAController = {
     return campaignToFSA(data.campaign);
   },
 
+  async searchHistory({ q, status } = {}) {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+    const data = await api.get(`/campaigns/history?${params}`);
+    return (data.campaigns || []).map(campaignToFSA);
+  },
+
   async analyticsFor(fundraiserId) {
     const { items } = await this.search({ fundraiserId, pageSize: 1000 });
     return {

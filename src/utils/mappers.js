@@ -15,6 +15,8 @@ export function campaignToFSA(c) {
     views: c.views || 0,
     shortlisted: c.shortlisted || 0,
     withdrawalHeld: c.withdrawal_held || false,
+    urgencyTier: c.urgency_tier || 'LOW',
+    rejectionRemarks: c.rejection_remarks || '',
     createdAt: c.created_at,
   };
 }

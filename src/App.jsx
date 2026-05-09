@@ -44,6 +44,7 @@ import DonationHistory from './boundary/donee/DonationHistory.jsx';
 import PlatformDashboard from './boundary/platform/PlatformDashboard.jsx';
 import CategoryManagement from './boundary/platform/CategoryManagement.jsx';
 import CampaignReview from './boundary/platform/CampaignReview.jsx';
+import CampaignHistory from './boundary/platform/CampaignHistory.jsx';
 import Reports from './boundary/platform/Reports.jsx';
 
 // Assessor
@@ -146,6 +147,9 @@ export default function App() {
                 } />
                 <Route path="/platform/reports" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><Reports /></ProtectedRoute>
+                } />
+                <Route path="/platform/history" element={
+                  <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CampaignHistory /></ProtectedRoute>
                 } />
 
                 {/* Assessor */}

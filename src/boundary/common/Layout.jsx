@@ -67,6 +67,7 @@ const NAV_BY_ROLE = {
   [ROLES.PLATFORM_MANAGER]: [
     { to: '/platform',            label: 'Dashboard',        icon: <DashboardIcon /> },
     { to: '/platform/campaigns',  label: 'Campaign Review',  icon: <CampaignIcon /> },
+    { to: '/platform/history',    label: 'History',          icon: <HistoryIcon /> },
     { to: '/platform/categories', label: 'Categories',       icon: <CategoryIcon /> },
     { to: '/platform/reports',    label: 'Reports',          icon: <AssessmentIcon /> },
   ],
