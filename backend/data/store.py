@@ -11,20 +11,37 @@ import os
 import uuid
 from contextlib import contextmanager
 from decimal import Decimal
+from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/frwa",
-)
+
+def _database_url() -> str:
+    env_value = os.environ.get("DATABASE_URL")
+    if env_value:
+        return env_value
+
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    if env_path.exists():
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key.strip() == "DATABASE_URL":
+                return value.strip().strip("\"'")
+
+    return "postgresql://postgres:postgres@localhost:5432/frwa"
 
 
 @contextmanager
 def _db():
     """Yield a connection that auto-commits on success or rolls back on error."""
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    conn = psycopg2.connect(
+        _database_url(),
+        cursor_factory=psycopg2.extras.RealDictCursor,
+    )
     try:
         yield conn
         conn.commit()

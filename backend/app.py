@@ -1,6 +1,7 @@
 """Flask application factory."""
 
 import os
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -13,7 +14,6 @@ from boundary.assessor_routes import assessor_bp
 from boundary.compliance_routes import compliance_bp
 from boundary.config_routes import config_bp
 from boundary.upload_routes import upload_bp
-
 
 def create_app() -> Flask:
     app = Flask(__name__)

@@ -24,18 +24,28 @@ psql -U postgres -d frwa -f "backend\data\314 db.sql"
 psql -U postgres -d frwa -f "backend\data\seed_dummy_data.sql"
 ```
 
-Start the backend with the local database URL:
+Create `backend/.env` from the example and add your local database URL:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
+
+Example `backend/.env`:
+
+```env
+DATABASE_URL=postgresql://postgres:admin123@localhost:5432/frwa
+```
+
+Start the backend:
 
 ```powershell
 cd backend
-$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
 python app.py
 ```
 
-Run backend tests with the same database URL:
+Run backend tests with the same `.env` values loaded automatically:
 
 ```powershell
-$env:DATABASE_URL='postgresql://postgres:admin123@localhost:5432/frwa'
 python -m pytest
 ```
 
