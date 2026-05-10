@@ -1,5 +1,5 @@
 /** Donee donation history with category/date filters and FSA progress tracking. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Card, Chip, Grid, LinearProgress, MenuItem, Pagination, Stack, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Typography,
@@ -20,11 +20,26 @@ export default function DonationHistory() {
   const categories = CategoryController.list();
   const [filters, setFilters] = useState({ categoryId: '', from: '', to: '' });
   const [page, setPage] = useState(1);
+  const [result, setResult] = useState({ items: [], total: 0 });
+  const [fsaMap, setFsaMap] = useState({});
 
-  const { items, total } = useMemo(
-    () => DonationController.searchForDonee(user.id, { ...filters, page, pageSize: PAGE_SIZE }),
-    [filters, page, user.id]
-  );
+  useEffect(() => {
+    if (!user) return;
+    DonationController.searchForDonee(user.id, { ...filters, page, pageSize: PAGE_SIZE })
+      .then((res) => {
+        setResult(res);
+        const ids = [...new Set(res.items.map((d) => d.fsaId))];
+        Promise.all(ids.map((id) => FSAController.getById(id).catch(() => null)))
+          .then((fsas) => {
+            const map = {};
+            fsas.forEach((f) => { if (f) map[f.id] = f; });
+            setFsaMap(map);
+          });
+      })
+      .catch(() => setResult({ items: [], total: 0 }));
+  }, [user, filters, page]);
+
+  const { items, total } = result;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const totalGiven = items.reduce((s, d) => s + d.amount, 0);
 
@@ -42,7 +57,7 @@ export default function DonationHistory() {
           <Grid item xs={12} sm={4}>
             <TextField select label="Category" value={filters.categoryId} onChange={onFilterChange('categoryId')} fullWidth>
               <MenuItem value="">All</MenuItem>
-              {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              {categories.map((c) => <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={6} sm={4}>
@@ -74,9 +89,9 @@ export default function DonationHistory() {
               </TableHead>
               <TableBody>
                 {items.map((d) => {
-                  const fsa = FSAController.getById(d.fsaId);
+                  const fsa = fsaMap[d.fsaId];
                   if (!fsa) return null;
-                  const cat = categories.find((c) => c.id === fsa.categoryId);
+                  const cat = categories.find((c) => c.id === fsa.categoryId || c.name === fsa.categoryId);
                   const progress = Math.min(100, Math.round((fsa.raisedAmount / fsa.goalAmount) * 100));
                   return (
                     <TableRow key={d.id} hover>
@@ -86,7 +101,7 @@ export default function DonationHistory() {
                           {fsa.title}
                         </Typography>
                       </TableCell>
-                      <TableCell>{cat?.name || '—'}</TableCell>
+                      <TableCell>{cat?.name || fsa.categoryId || '—'}</TableCell>
                       <TableCell align="right"><Typography fontWeight={600}>{formatCurrency(d.amount)}</Typography></TableCell>
                       <TableCell>
                         <Stack spacing={0.5}>
@@ -104,7 +119,6 @@ export default function DonationHistory() {
             </Table>
           </Box>
         )}
-
         {pageCount > 1 && (
           <Stack direction="row" justifyContent="center" sx={{ p: 2 }}>
             <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" />

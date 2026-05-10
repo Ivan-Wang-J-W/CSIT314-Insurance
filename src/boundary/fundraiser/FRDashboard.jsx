@@ -1,5 +1,6 @@
 /** Fundraiser dashboard — their own stats + quick links + recent activity. */
-import { Grid, Card, CardContent, Typography, Button, Stack, List, ListItem, ListItemText } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Grid, Card, CardContent, Typography, Button, Stack, List, ListItem, ListItemText, CircularProgress, Box } from '@mui/material';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
@@ -13,12 +14,32 @@ import { FSAController } from '../../control/FSAController.js';
 import { DonationController } from '../../control/DonationController.js';
 import { formatCurrency, timeAgo } from '../../utils/formatters.js';
 
+const DEFAULT_ANALYTICS = { total: 0, active: 0, completed: 0, totalViews: 0, totalShortlisted: 0, totalRaised: 0, items: [] };
+
 export default function FRDashboard() {
   const { user } = useAuth();
-  const analytics = FSAController.analyticsFor(user.id);
-  const recentDonations = DonationController.forFundraiser(user.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5);
+  const [analytics, setAnalytics] = useState(DEFAULT_ANALYTICS);
+  const [recentDonations, setRecentDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    Promise.all([
+      FSAController.analyticsFor(user.id),
+      DonationController.forFundraiser(user.id),
+    ]).then(([a, donations]) => {
+      setAnalytics(a);
+      setRecentDonations(
+        [...donations].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
+      );
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [user?.id]);
+
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+      <CircularProgress />
+    </Box>
+  );
 
   return (
     <>
@@ -57,14 +78,17 @@ export default function FRDashboard() {
                 <Button size="small" component={RouterLink} to="/fundraiser/manage">Manage all</Button>
               </Stack>
               <List disablePadding>
-                {analytics.items
-                  .sort((a, b) => b.views - a.views)
+                {analytics.items.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">No campaigns yet.</Typography>
+                )}
+                {[...analytics.items]
+                  .sort((a, b) => b.raisedAmount - a.raisedAmount)
                   .slice(0, 5)
                   .map((f) => (
                     <ListItem key={f.id} divider>
                       <ListItemText
                         primary={f.title}
-                        secondary={`${f.views} views · ${f.shortlisted} saved`}
+                        secondary={`${f.status}`}
                       />
                       <Typography variant="body2" fontWeight={600}>{formatCurrency(f.raisedAmount)}</Typography>
                     </ListItem>

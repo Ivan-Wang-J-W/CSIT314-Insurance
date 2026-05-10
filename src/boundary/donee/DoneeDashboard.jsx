@@ -1,9 +1,11 @@
 /** Donee dashboard — personal giving stats + recent activity. */
-import { Grid, Card, CardContent, Typography, List, ListItem, ListItemText, Button, Stack } from '@mui/material';
+import { useEffect, useState } from 'react';
+import { Alert, AlertTitle, Grid, Card, CardContent, Typography, List, ListItem, ListItemText, Button, Stack } from '@mui/material';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import SearchIcon from '@mui/icons-material/Search';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { Link as RouterLink } from 'react-router-dom';
 import PageHeader from '../common/PageHeader.jsx';
 import StatCard from '../common/StatCard.jsx';
@@ -15,16 +17,36 @@ import { formatCurrency, timeAgo } from '../../utils/formatters.js';
 
 export default function DoneeDashboard() {
   const { user } = useAuth();
-  const donations = DonationController.all().filter((d) => d.doneeId === user.id);
+  const [donations, setDonations] = useState([]);
+  const [favs, setFavs] = useState([]);
+  const [supportedFSAs, setSupportedFSAs] = useState([]);
+  const [goalAlerts, setGoalAlerts] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      DonationController.searchForDonee(user.id, { pageSize: 1000 }),
+      FavoriteController.favoriteFSAs(user.id),
+      DonationController.goalAlerts(),
+    ])
+      .then(([donResult, favsList, alerts]) => {
+        const dons = donResult.items || [];
+        setDonations(dons);
+        setFavs(favsList);
+        setGoalAlerts(alerts);
+        const fsaIds = [...new Set(dons.map((d) => d.fsaId))];
+        return Promise.all(fsaIds.map((id) => FSAController.getById(id).catch(() => null)));
+      })
+      .then((fsas) => setSupportedFSAs(fsas.filter(Boolean)))
+      .catch(() => {});
+  }, [user]);
+
   const totalGiven = donations.reduce((s, d) => s + d.amount, 0);
-  const favs = FavoriteController.favoriteFSAs(user.id);
-  const supportedFSAIds = new Set(donations.map((d) => d.fsaId));
-  const supportedFSAs = FSAController.all().filter((f) => supportedFSAIds.has(f.id));
 
   return (
     <>
       <PageHeader
-        title={`Hi, ${user.fullName?.split(' ')[0] || user.username}`}
+        title={`Hi, ${user?.fullName?.split(' ')[0] || user?.username}`}
         subtitle="Your impact at a glance"
         actions={
           <Button variant="contained" startIcon={<SearchIcon />} component={RouterLink} to="/donee/browse">
@@ -32,6 +54,34 @@ export default function DoneeDashboard() {
           </Button>
         }
       />
+
+      {goalAlerts.length > 0 && (
+        <Stack spacing={1} sx={{ mb: 3 }}>
+          {goalAlerts.map((a) => {
+            const pct = Math.min(100, Math.round((a.raised_amount / a.goal_amount) * 100));
+            return (
+              <Alert
+                key={a.id}
+                severity="warning"
+                icon={<WarningAmberIcon />}
+                action={
+                  <Button
+                    color="warning" size="small" variant="outlined"
+                    component={RouterLink} to={`/fsa/${a.id}`}
+                  >
+                    Donate Now
+                  </Button>
+                }
+              >
+                <AlertTitle>Campaign Near Its Goal!</AlertTitle>
+                <strong>{a.title}</strong> is {pct}% funded — only{' '}
+                {formatCurrency(a.goal_amount - a.raised_amount)} left to reach the goal.
+                Donate before it closes!
+              </Alert>
+            );
+          })}
+        </Stack>
+      )}
 
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>

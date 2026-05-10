@@ -1,5 +1,5 @@
 /** FR's completed/past FSAs — filterable by category and date range. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, Grid, MenuItem, Pagination, Stack, TextField } from '@mui/material';
 import PageHeader from '../common/PageHeader.jsx';
 import FSACard from '../common/FSACard.jsx';
@@ -16,16 +16,22 @@ export default function FRHistory() {
   const categories = CategoryController.list();
   const [filters, setFilters] = useState({ q: '', categoryId: '', from: '', to: '' });
   const [page, setPage] = useState(1);
+  const [result, setResult] = useState({ items: [], total: 0 });
 
-  const { items, total } = useMemo(
-    () => FSAController.search({
+  useEffect(() => {
+    if (!user) return;
+    FSAController.search({
       ...filters,
       fundraiserId: user.id,
       status: FSA_STATUS.COMPLETED,
-      page, pageSize: PAGE_SIZE,
-    }),
-    [filters, page, user.id]
-  );
+      page,
+      pageSize: PAGE_SIZE,
+    })
+      .then(setResult)
+      .catch(() => {});
+  }, [filters, page, user]);
+
+  const { items, total } = result;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const onFilterChange = (k) => (e) => { setFilters((f) => ({ ...f, [k]: e.target.value })); setPage(1); };
@@ -42,7 +48,7 @@ export default function FRHistory() {
           <Grid item xs={12} sm={4} md={2}>
             <TextField select label="Category" value={filters.categoryId} onChange={onFilterChange('categoryId')} fullWidth>
               <MenuItem value="">All</MenuItem>
-              {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              {categories.map((c) => <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={6} sm={4} md={3}>

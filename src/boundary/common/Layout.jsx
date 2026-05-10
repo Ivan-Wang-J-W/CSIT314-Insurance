@@ -30,6 +30,8 @@ import SearchIcon        from '@mui/icons-material/Search';
 import FavoriteIcon      from '@mui/icons-material/Favorite';
 import CategoryIcon      from '@mui/icons-material/Category';
 import AssessmentIcon    from '@mui/icons-material/Assessment';
+import VerifiedUserIcon  from '@mui/icons-material/VerifiedUser';
+import GavelIcon         from '@mui/icons-material/Gavel';
 import LogoutIcon        from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VolunteerActivismIcon from '@mui/icons-material/VolunteerActivism';
@@ -63,9 +65,17 @@ const NAV_BY_ROLE = {
     { to: '/donee/history',   label: 'Donation History', icon: <HistoryIcon /> },
   ],
   [ROLES.PLATFORM_MANAGER]: [
-    { to: '/platform',            label: 'Dashboard',  icon: <DashboardIcon /> },
-    { to: '/platform/categories', label: 'Categories', icon: <CategoryIcon /> },
-    { to: '/platform/reports',    label: 'Reports',    icon: <AssessmentIcon /> },
+    { to: '/platform',            label: 'Dashboard',        icon: <DashboardIcon /> },
+    { to: '/platform/campaigns',  label: 'Campaign Review',  icon: <CampaignIcon /> },
+    { to: '/platform/history',    label: 'History',          icon: <HistoryIcon /> },
+    { to: '/platform/categories', label: 'Categories',       icon: <CategoryIcon /> },
+    { to: '/platform/reports',    label: 'Reports',          icon: <AssessmentIcon /> },
+  ],
+  [ROLES.ASSESSOR]: [
+    { to: '/assessor', label: 'Dashboard', icon: <VerifiedUserIcon /> },
+  ],
+  [ROLES.COMPLIANCE]: [
+    { to: '/compliance', label: 'Dashboard', icon: <GavelIcon /> },
   ],
 };
 

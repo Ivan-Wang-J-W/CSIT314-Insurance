@@ -3,7 +3,7 @@
  * GoFundMe-inspired: hero search, live platform stats, featured campaigns,
  * category browser, how-it-works steps, and a CTA banner.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AppBar, Avatar, Box, Button, Card, CardContent, CardMedia, Chip, Container,
   Grid, InputAdornment, LinearProgress, Stack, TextField, Toolbar, Typography,
@@ -59,20 +59,24 @@ const HOW_IT_WORKS = [
   },
 ];
 
+const DEFAULT_OVERVIEW = { totalFSAs: 0, activeFSAs: 0, totalDonations: 0, totalAmountRaised: 0 };
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [overview, setOverview] = useState(DEFAULT_OVERVIEW);
+  const [featuredFSAs, setFeaturedFSAs] = useState([]);
 
-  const overview    = ReportController.overview();
-  const categories  = CategoryController.all().filter((c) => c.active);
-  const featuredFSAs = useMemo(
-    () =>
-      FSAController.all()
-        .filter((f) => f.status === FSA_STATUS.ACTIVE)
-        .sort((a, b) => b.raisedAmount - a.raisedAmount)
-        .slice(0, 6),
-    [],
-  );
+  const categories = useMemo(() => CategoryController.all().filter((c) => c.active), []);
+
+  useEffect(() => {
+    ReportController.publicStats().then(setOverview).catch(() => {});
+    FSAController.search({ status: FSA_STATUS.ACTIVE, pageSize: 6 })
+      .then(({ items }) =>
+        setFeaturedFSAs([...items].sort((a, b) => b.raisedAmount - a.raisedAmount))
+      )
+      .catch(() => {});
+  }, []);
 
   const handleSearch = () =>
     navigate(`/login?next=/donee/browse${search ? `&q=${encodeURIComponent(search)}` : ''}`);

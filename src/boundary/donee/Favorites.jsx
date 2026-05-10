@@ -1,5 +1,5 @@
 /** Donee's saved FSAs — reuses FSACard with favourite toggle. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Grid } from '@mui/material';
 import PageHeader from '../common/PageHeader.jsx';
 import FSACard from '../common/FSACard.jsx';
@@ -11,17 +11,25 @@ import { FavoriteController } from '../../control/FavoriteController.js';
 export default function Favorites() {
   const { user } = useAuth();
   const toast = useToast();
+  const [favorites, setFavorites] = useState([]);
   const [version, setVersion] = useState(0);
 
-  const favorites = FavoriteController.favoriteFSAs(user.id);
+  useEffect(() => {
+    if (!user) return;
+    FavoriteController.favoriteFSAs(user.id)
+      .then(setFavorites)
+      .catch(() => setFavorites([]));
+  }, [user, version]);
 
-  const toggle = (fsa) => {
-    FavoriteController.toggle(user.id, fsa.id);
-    toast.success('Removed from favourites');
-    setVersion((v) => v + 1);
+  const toggle = async (fsa) => {
+    try {
+      await FavoriteController.toggle(user.id, fsa.id);
+      toast.success('Removed from favourites');
+      setVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
-  // version is read indirectly through re-render
-  void version;
 
   return (
     <>

@@ -1,11 +1,15 @@
 /**
  * FSAForm — reusable create/edit form used by both CreateFSA and the edit dialog.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Button, Grid, MenuItem, Stack, TextField, InputAdornment,
+  Box, Button, CircularProgress, Grid, MenuItem, Stack, TextField, InputAdornment, Typography,
 } from '@mui/material';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ClearIcon from '@mui/icons-material/Clear';
 import { CategoryController } from '../../control/CategoryController.js';
+import { useToast } from '../../context/ToastContext.jsx';
+import { api } from '../../utils/api.js';
 import {
   validateForm, required, minLength, positiveNumber, composeRules,
 } from '../../utils/validators.js';
@@ -30,7 +34,25 @@ const DEFAULT_VALUES = {
 export default function FSAForm({ initialValues, onSubmit, onCancel, submitLabel = 'Create' }) {
   const [values, setValues] = useState(() => ({ ...DEFAULT_VALUES, ...initialValues }));
   const [errors, setErrors] = useState({});
+  const [uploading, setUploading] = useState(false);
   const categories = CategoryController.listActive();
+  const toast = useToast();
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { url } = await api.upload('/uploads/', file);
+      setValues((v) => ({ ...v, imageUrl: url }));
+    } catch (err) {
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   // Sync external updates (e.g. opening the edit dialog with a different FSA).
   useEffect(() => { if (initialValues) setValues((v) => ({ ...v, ...initialValues })); }, [initialValues]);
@@ -66,7 +88,7 @@ export default function FSAForm({ initialValues, onSubmit, onCancel, submitLabel
           <TextField select name="categoryId" label="Category" value={values.categoryId}
             onChange={onChange} error={Boolean(errors.categoryId)} helperText={errors.categoryId} fullWidth>
             {categories.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>
             ))}
           </TextField>
         </Grid>
@@ -92,8 +114,46 @@ export default function FSAForm({ initialValues, onSubmit, onCancel, submitLabel
           <TextField name="location" label="Location" value={values.location} onChange={onChange} fullWidth />
         </Grid>
         <Grid item xs={12} sm={6}>
-          <TextField name="imageUrl" label="Cover Image URL" value={values.imageUrl} onChange={onChange} fullWidth
-            placeholder="https://images.unsplash.com/…" />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={uploading ? <CircularProgress size={14} /> : <CloudUploadIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? 'Uploading…' : 'Upload Cover Image'}
+              </Button>
+              {values.imageUrl && (
+                <Button
+                  size="small" color="error" startIcon={<ClearIcon />}
+                  onClick={() => setValues((v) => ({ ...v, imageUrl: '' }))}
+                >
+                  Remove
+                </Button>
+              )}
+            </Stack>
+            {values.imageUrl ? (
+              <Box
+                component="img"
+                src={values.imageUrl}
+                alt="Cover preview"
+                sx={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+              />
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                PNG, JPG, GIF or WEBP · max 5 MB
+              </Typography>
+            )}
+          </Stack>
         </Grid>
 
         <Grid item xs={12}>

@@ -10,6 +10,16 @@ dist-ssr
 *.log
 coverage
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Uploaded files (user content, not source code)
+backend/uploads/
+
+# Claude Code config
+.claude/
 # Python caches
 __pycache__/
 *.pyc

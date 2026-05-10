@@ -12,9 +12,9 @@ export default function CreateFSA() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const handleSubmit = (values) => {
+  const handleSubmit = async (values) => {
     try {
-      FSAController.create({ ...values, fundraiserId: user.id });
+      await FSAController.create({ ...values, fundraiserId: user.id });
       toast.success('Fundraising activity created');
       navigate('/fundraiser/manage');
     } catch (err) {

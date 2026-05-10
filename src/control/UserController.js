@@ -1,85 +1,60 @@
-/**
- * UserController
- * Admin-facing user management: list, search, suspend/reactivate, delete, create.
- */
-import { KEYS, readCollection, writeCollection, nextId } from './dataStore.js';
-import { User, ROLES } from '../entity/User.js';
+import { api } from '../utils/api.js';
+import { backendToUser, userToPayload } from '../utils/mappers.js';
 
 export const UserController = {
-  list() {
-    return readCollection(KEYS.USERS).map((u) => new User(u).toSafeObject());
-  },
-
-  /** Filter + paginate users for the admin table. */
-  search({ q = '', role = '', status = '', page = 1, pageSize = 10 } = {}) {
-    let list = this.list();
-    if (q) {
-      const needle = q.toLowerCase();
-      list = list.filter(
-        (u) =>
-          u.username.toLowerCase().includes(needle) ||
-          u.email.toLowerCase().includes(needle) ||
-          (u.fullName || '').toLowerCase().includes(needle)
-      );
-    }
-    if (role) list = list.filter((u) => u.role === role);
-    if (status) list = list.filter((u) => u.status === status);
-
-    const total = list.length;
-    const start = (page - 1) * pageSize;
-    return { items: list.slice(start, start + pageSize), total };
-  },
-
-  getById(id) {
-    const raw = readCollection(KEYS.USERS).find((u) => u.id === id);
-    return raw ? new User(raw).toSafeObject() : null;
-  },
-
-  create(data) {
-    const users = readCollection(KEYS.USERS);
-    if (users.some((u) => u.username === data.username)) throw new Error('Username already taken');
-    if (users.some((u) => u.email === data.email)) throw new Error('Email already registered');
-    const user = new User({
-      id: nextId('u'),
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      role: ROLES.DONEE,
-      ...data,
+  async create({ fullName, email, username, password, role }) {
+    const data = await api.post('/admin/users/', {
+      full_name: fullName,
+      email,
+      username,
+      password,
+      role,
     });
-    writeCollection(KEYS.USERS, [...users, { ...user }]);
-    return user.toSafeObject();
+    return backendToUser(data.user);
   },
 
-  update(id, patch) {
-    const users = readCollection(KEYS.USERS);
-    const i = users.findIndex((u) => u.id === id);
-    if (i < 0) throw new Error('User not found');
-    users[i] = { ...users[i], ...patch };
-    writeCollection(KEYS.USERS, users);
-    return new User(users[i]).toSafeObject();
-  },
-
-  /** Toggle ACTIVE ↔ SUSPENDED. Keeps an audit-friendly single entry point. */
-  toggleStatus(id) {
-    const current = this.getById(id);
-    if (!current) throw new Error('User not found');
-    return this.update(id, { status: current.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' });
-  },
-
-  delete(id) {
-    const users = readCollection(KEYS.USERS).filter((u) => u.id !== id);
-    writeCollection(KEYS.USERS, users);
-  },
-
-  stats() {
-    const users = this.list();
+  async search({ q, role, status, page = 1, pageSize = 10 } = {}) {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (role) params.set('role', role);
+    if (status) params.set('status', status);
+    params.set('page', page);
+    params.set('page_size', pageSize);
+    const data = await api.get(`/admin/users/?${params}`);
     return {
-      total: users.length,
-      byRole: Object.fromEntries(
-        Object.values(ROLES).map((r) => [r, users.filter((u) => u.role === r).length])
-      ),
-      active: users.filter((u) => u.status === 'ACTIVE').length,
-      suspended: users.filter((u) => u.status === 'SUSPENDED').length,
+      items: (data.users || []).map(backendToUser),
+      total: data.total || 0,
+    };
+  },
+
+  async update(id, payload) {
+    try {
+      const data = await api.put('/auth/me', userToPayload(payload));
+      return backendToUser(data.user);
+    } catch {
+      const data = await api.put(`/admin/users/${id}`, userToPayload(payload));
+      return backendToUser(data.user);
+    }
+  },
+
+  async toggleStatus(id) {
+    const data = await api.post(`/admin/users/${id}/toggle-status`, {});
+    return backendToUser(data.user);
+  },
+
+  async delete(id) {
+    await api.del(`/admin/users/${id}`);
+  },
+
+  async stats() {
+    const { items } = await this.search({ pageSize: 1000 });
+    const byRole = {};
+    items.forEach((u) => { byRole[u.role] = (byRole[u.role] || 0) + 1; });
+    return {
+      total: items.length,
+      active: items.filter((u) => u.status === 'ACTIVE').length,
+      suspended: items.filter((u) => u.status === 'SUSPENDED').length,
+      byRole,
     };
   },
 };

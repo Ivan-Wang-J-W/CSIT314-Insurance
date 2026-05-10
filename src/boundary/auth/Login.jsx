@@ -17,13 +17,17 @@ const HOME_BY_ROLE = {
   [ROLES.FUNDRAISER]: '/fundraiser',
   [ROLES.DONEE]: '/donee',
   [ROLES.PLATFORM_MANAGER]: '/platform',
+  [ROLES.ASSESSOR]: '/assessor',
+  [ROLES.COMPLIANCE]: '/compliance',
 };
 
 const DEMO_ACCOUNTS = [
   { label: 'Admin', username: 'admin', password: 'admin123' },
-  { label: 'Fundraiser', username: 'fr1@frwa.io', password: 'password' },
-  { label: 'Donee', username: 'dn1@frwa.io', password: 'password' },
-  { label: 'Platform Manager', username: 'pm', password: 'pm123' },
+  { label: 'Fundraiser', username: 'fr1', password: 'password' },
+  { label: 'Donee', username: 'donee1', password: 'password' },
+  { label: 'Platform Manager', username: 'pm', password: 'password' },
+  { label: 'Assessor', username: 'assessor', password: 'password' },
+  { label: 'Compliance', username: 'compliance', password: 'password' },
 ];
 
 export default function Login() {
@@ -49,7 +53,7 @@ export default function Login() {
 
     setSubmitting(true);
     try {
-      const user = login(values.username, values.password);
+      const user = await login(values.username, values.password);
       const redirectTo = location.state?.from?.pathname || HOME_BY_ROLE[user.role] || '/';
       navigate(redirectTo, { replace: true });
     } catch (err) {
@@ -117,12 +121,7 @@ export default function Login() {
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             {DEMO_ACCOUNTS.map((a) => (
-              <Button
-                key={a.label}
-                size="small"
-                variant="outlined"
-                onClick={() => fillDemo(a)}
-              >
+              <Button key={a.label} size="small" variant="outlined" onClick={() => fillDemo(a)}>
                 {a.label}
               </Button>
             ))}

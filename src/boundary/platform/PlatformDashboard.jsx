@@ -1,4 +1,5 @@
 /** Platform Manager dashboard — high-level KPIs + category breakdown. */
+import { useEffect, useState } from 'react';
 import { Grid, Card, CardContent, Typography, LinearProgress, Stack, Box } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import CampaignIcon from '@mui/icons-material/Campaign';
@@ -10,8 +11,17 @@ import { ReportController } from '../../control/ReportController.js';
 import { formatCurrency } from '../../utils/formatters.js';
 
 export default function PlatformDashboard() {
-  const overview = ReportController.overview();
-  const byCategory = ReportController.byCategory();
+  const [overview, setOverview] = useState({
+    totalUsers: 0, activeFSAs: 0, totalFSAs: 0, completedFSAs: 0,
+    totalAmountRaised: 0, totalDonations: 0, totalCategories: 0,
+  });
+  const [byCategory, setByCategory] = useState([]);
+
+  useEffect(() => {
+    ReportController.overview().then(setOverview).catch(() => {});
+    ReportController.byCategory().then(setByCategory).catch(() => {});
+  }, []);
+
   const maxRaised = Math.max(1, ...byCategory.map((b) => b.totalRaised));
 
   return (
@@ -38,23 +48,24 @@ export default function PlatformDashboard() {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>Donations by Category</Typography>
-          <Stack spacing={2}>
-            {byCategory.map(({ category, fsaCount, donationCount, totalRaised }) => (
-              <Box key={category.id}>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                  <Typography variant="body2" fontWeight={600}>{category.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatCurrency(totalRaised)} · {fsaCount} FSAs · {donationCount} donations
-                  </Typography>
-                </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={(totalRaised / maxRaised) * 100}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-            ))}
-          </Stack>
+          {byCategory.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">No category data yet.</Typography>
+          ) : (
+            <Stack spacing={2}>
+              {byCategory.map(({ category, fsaCount, donationCount, totalRaised }) => (
+                <Box key={category.id || category.name}>
+                  <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" fontWeight={600}>{category.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatCurrency(totalRaised)} · {fsaCount} FSAs · {donationCount} donations
+                    </Typography>
+                  </Stack>
+                  <LinearProgress variant="determinate" value={(totalRaised / maxRaised) * 100}
+                    sx={{ height: 8, borderRadius: 4 }} />
+                </Box>
+              ))}
+            </Stack>
+          )}
         </CardContent>
       </Card>
     </>

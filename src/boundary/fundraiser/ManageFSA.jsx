@@ -1,5 +1,5 @@
 /** Fundraiser's list of FSAs — inline edit, cancel, and delete. */
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Button, Card, Chip, Dialog, DialogContent, DialogTitle, Grid, IconButton, MenuItem,
   Pagination, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography,
@@ -28,37 +28,53 @@ export default function ManageFSA() {
   const [version, setVersion] = useState(0);
   const [editing, setEditing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [result, setResult] = useState({ items: [], total: 0 });
 
   const categories = CategoryController.list();
 
-  const { items, total } = useMemo(
-    () => FSAController.search({
+  useEffect(() => {
+    if (!user) return;
+    FSAController.search({
       ...filters, fundraiserId: user.id, page, pageSize: PAGE_SIZE,
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, page, version, user.id]
-  );
+    })
+      .then(setResult)
+      .catch(() => {});
+  }, [filters, page, version, user]);
+
+  const { items, total } = result;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const onFilterChange = (k) => (e) => { setFilters((f) => ({ ...f, [k]: e.target.value })); setPage(1); };
 
-  const handleSaveEdit = (values) => {
-    FSAController.update(editing.id, values);
-    setEditing(null);
-    setVersion((v) => v + 1);
-    toast.success('FSA updated');
+  const handleSaveEdit = async (values) => {
+    try {
+      await FSAController.update(editing.id, values);
+      setEditing(null);
+      setVersion((v) => v + 1);
+      toast.success('FSA updated');
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
-  const handleCancel = (fsa) => {
-    FSAController.update(fsa.id, { status: FSA_STATUS.CANCELLED });
-    setVersion((v) => v + 1);
-    toast.success('FSA cancelled');
+  const handleCancel = async (fsa) => {
+    try {
+      await FSAController.update(fsa.id, { status: FSA_STATUS.CANCELLED });
+      setVersion((v) => v + 1);
+      toast.success('FSA cancelled');
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
-  const handleDelete = (fsa) => {
-    FSAController.delete(fsa.id);
-    setVersion((v) => v + 1);
-    toast.success('FSA deleted');
+  const handleDelete = async (fsa) => {
+    try {
+      await FSAController.delete(fsa.id);
+      setVersion((v) => v + 1);
+      toast.success('FSA deleted');
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   return (
@@ -74,7 +90,7 @@ export default function ManageFSA() {
           <Grid item xs={12} sm={6} md={3}>
             <TextField select label="Category" value={filters.categoryId} onChange={onFilterChange('categoryId')} fullWidth>
               <MenuItem value="">All categories</MenuItem>
-              {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              {categories.map((c) => <MenuItem key={c.id} value={c.name}>{c.name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -104,7 +120,7 @@ export default function ManageFSA() {
               </TableHead>
               <TableBody>
                 {items.map((f) => {
-                  const category = categories.find((c) => c.id === f.categoryId);
+                  const category = categories.find((c) => c.id === f.categoryId || c.name === f.categoryId);
                   return (
                     <TableRow key={f.id} hover>
                       <TableCell>
@@ -113,15 +129,11 @@ export default function ManageFSA() {
                           {f.views} views · {f.shortlisted} saved
                         </Typography>
                       </TableCell>
-                      <TableCell>{category?.name || '—'}</TableCell>
+                      <TableCell>{category?.name || f.categoryId || '—'}</TableCell>
                       <TableCell><Chip size="small" label={f.status} /></TableCell>
                       <TableCell align="right">
-                        <Typography variant="body2" fontWeight={600}>
-                          {formatCurrency(f.raisedAmount)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          of {formatCurrency(f.goalAmount)}
-                        </Typography>
+                        <Typography variant="body2" fontWeight={600}>{formatCurrency(f.raisedAmount)}</Typography>
+                        <Typography variant="caption" color="text.secondary">of {formatCurrency(f.goalAmount)}</Typography>
                       </TableCell>
                       <TableCell>{formatDate(f.endDate)}</TableCell>
                       <TableCell align="right">
@@ -148,7 +160,6 @@ export default function ManageFSA() {
             </Table>
           </Box>
         )}
-
         {pageCount > 1 && (
           <Stack direction="row" justifyContent="center" sx={{ p: 2 }}>
             <Pagination count={pageCount} page={page} onChange={(_, p) => setPage(p)} color="primary" />

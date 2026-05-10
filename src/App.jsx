@@ -43,7 +43,15 @@ import DonationHistory from './boundary/donee/DonationHistory.jsx';
 // Platform
 import PlatformDashboard from './boundary/platform/PlatformDashboard.jsx';
 import CategoryManagement from './boundary/platform/CategoryManagement.jsx';
+import CampaignReview from './boundary/platform/CampaignReview.jsx';
+import CampaignHistory from './boundary/platform/CampaignHistory.jsx';
 import Reports from './boundary/platform/Reports.jsx';
+
+// Assessor
+import AssessorDashboard from './boundary/assessor/AssessorDashboard.jsx';
+
+// Compliance
+import ComplianceDashboard from './boundary/compliance/ComplianceDashboard.jsx';
 
 // Shared pages
 import LandingPage from './boundary/common/LandingPage.jsx';
@@ -62,6 +70,8 @@ function RootPage() {
     [ROLES.FUNDRAISER]: '/fundraiser',
     [ROLES.DONEE]: '/donee',
     [ROLES.PLATFORM_MANAGER]: '/platform',
+    [ROLES.ASSESSOR]: '/assessor',
+    [ROLES.COMPLIANCE]: '/compliance',
   }[user.role] || '/login';
   return <Navigate to={home} replace />;
 }
@@ -129,11 +139,27 @@ export default function App() {
                 <Route path="/platform" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><PlatformDashboard /></ProtectedRoute>
                 } />
+                <Route path="/platform/campaigns" element={
+                  <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CampaignReview /></ProtectedRoute>
+                } />
                 <Route path="/platform/categories" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CategoryManagement /></ProtectedRoute>
                 } />
                 <Route path="/platform/reports" element={
                   <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><Reports /></ProtectedRoute>
+                } />
+                <Route path="/platform/history" element={
+                  <ProtectedRoute roles={[ROLES.PLATFORM_MANAGER]}><CampaignHistory /></ProtectedRoute>
+                } />
+
+                {/* Assessor */}
+                <Route path="/assessor" element={
+                  <ProtectedRoute roles={[ROLES.ASSESSOR]}><AssessorDashboard /></ProtectedRoute>
+                } />
+
+                {/* Compliance */}
+                <Route path="/compliance" element={
+                  <ProtectedRoute roles={[ROLES.COMPLIANCE]}><ComplianceDashboard /></ProtectedRoute>
                 } />
 
                 {/* Shared: any signed-in user can open an FSA detail or their profile */}

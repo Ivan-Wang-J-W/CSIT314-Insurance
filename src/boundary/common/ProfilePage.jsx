@@ -2,7 +2,7 @@
  * ProfilePage — any logged-in user can view and edit their own profile.
  * Shows role-specific activity stats below the edit form.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Avatar, Box, Button, Card, CardContent, Chip, Divider,
   Grid, Stack, TextField, Typography,
@@ -42,36 +42,44 @@ export default function ProfilePage() {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ fullName: user?.fullName || '', email: user?.email || '' });
+  const [doneeStats, setDoneeStats] = useState(null);
+  const [frStats, setFrStats] = useState(null);
 
-  /* ── Role-specific stats ── */
-  const doneeStats = user?.role === ROLES.DONEE
-    ? (() => {
-        const { total: count, items } = DonationController.searchForDonee(user.id, { pageSize: 9999 });
-        const totalAmount = items.reduce((s, d) => s + d.amount, 0);
-        const favs = FavoriteController.listForDonee(user.id).length;
-        return { totalAmount, count, favs };
-      })()
-    : null;
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === ROLES.DONEE) {
+      Promise.all([
+        DonationController.searchForDonee(user.id, { pageSize: 9999 }),
+        FavoriteController.favoriteFSAs(user.id),
+      ])
+        .then(([donResult, favs]) => {
+          const totalAmount = (donResult.items || []).reduce((s, d) => s + d.amount, 0);
+          setDoneeStats({ totalAmount, count: donResult.total || 0, favs: favs.length });
+        })
+        .catch(() => {});
+    }
+    if (user.role === ROLES.FUNDRAISER) {
+      FSAController.analyticsFor(user.id)
+        .then((analytics) => setFrStats({
+          raised: analytics.totalRaised,
+          views: analytics.totalViews,
+          active: analytics.active,
+          total: analytics.total,
+        }))
+        .catch(() => {});
+    }
+  }, [user]);
 
-  const frStats = user?.role === ROLES.FUNDRAISER
-    ? (() => {
-        const fsas   = FSAController.all().filter((f) => f.fundraiserId === user.id);
-        const raised  = fsas.reduce((s, f) => s + f.raisedAmount, 0);
-        const views   = fsas.reduce((s, f) => s + f.views, 0);
-        const active  = fsas.filter((f) => f.status === 'ACTIVE').length;
-        return { raised, views, active, total: fsas.length };
-      })()
-    : null;
-
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.fullName.trim()) { toast.error('Full name is required'); return; }
-    UserController.update(user.id, {
-      fullName: form.fullName.trim(),
-      email: form.email.trim(),
-    });
-    refresh();
-    toast.success('Profile updated');
-    setEditing(false);
+    try {
+      await UserController.update(user.id, { fullName: form.fullName.trim(), email: form.email.trim() });
+      refresh();
+      toast.success('Profile updated');
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const initials = (user?.fullName || user?.username || '?').charAt(0).toUpperCase();
@@ -86,67 +94,38 @@ export default function ProfilePage() {
           editing ? (
             <Stack direction="row" spacing={1}>
               <Button startIcon={<CancelIcon />} onClick={() => setEditing(false)}>Cancel</Button>
-              <Button startIcon={<SaveIcon />} variant="contained" disableElevation onClick={handleSave}>
-                Save Changes
-              </Button>
+              <Button startIcon={<SaveIcon />} variant="contained" disableElevation onClick={handleSave}>Save Changes</Button>
             </Stack>
           ) : (
-            <Button startIcon={<EditIcon />} variant="outlined" onClick={() => setEditing(true)}>
-              Edit Profile
-            </Button>
+            <Button startIcon={<EditIcon />} variant="outlined" onClick={() => setEditing(true)}>Edit Profile</Button>
           )
         }
       />
 
       <Grid container spacing={3}>
-
-        {/* ── Identity card ─────────────────────────────────────────── */}
         <Grid item xs={12} md={4}>
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 4.5, pb: 3 }}>
-              <Avatar
-                sx={{
-                  width: 92, height: 92, fontSize: 38, fontWeight: 800,
-                  bgcolor: bgColor, mb: 2.5,
-                  boxShadow: `0 0 0 4px white, 0 0 0 6px ${bgColor}33`,
-                }}
-              >
+              <Avatar sx={{ width: 92, height: 92, fontSize: 38, fontWeight: 800, bgcolor: bgColor, mb: 2.5,
+                boxShadow: `0 0 0 4px white, 0 0 0 6px ${bgColor}33` }}>
                 {initials}
               </Avatar>
-
               <Typography variant="h6" fontWeight={700}>{user?.fullName || user?.username}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                @{user?.username}
-              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>@{user?.username}</Typography>
               <Chip label={ROLE_LABELS[user?.role]} color="primary" size="small" sx={{ fontWeight: 600 }} />
-
               <Divider sx={{ width: '100%', my: 3 }} />
-
               <Stack spacing={2} sx={{ width: '100%' }}>
                 {[
-                  { label: 'Email',        value: user?.email },
+                  { label: 'Email', value: user?.email },
                   { label: 'Member Since', value: formatDate(user?.createdAt) },
-                  {
-                    label: 'Status',
-                    value: (
-                      <Chip
-                        label={user?.status} size="small"
-                        color={user?.status === 'ACTIVE' ? 'success' : 'warning'}
-                        sx={{ mt: 0.5 }}
-                      />
-                    ),
-                  },
+                  { label: 'Status', value: <Chip label={user?.status} size="small" color={user?.status === 'ACTIVE' ? 'success' : 'warning'} sx={{ mt: 0.5 }} /> },
                 ].map(({ label, value }) => (
                   <Box key={label}>
-                    <Typography
-                      variant="caption" color="text.secondary" fontWeight={700}
-                      sx={{ textTransform: 'uppercase', letterSpacing: 0.6 }}
-                    >
+                    <Typography variant="caption" color="text.secondary" fontWeight={700}
+                      sx={{ textTransform: 'uppercase', letterSpacing: 0.6 }}>
                       {label}
                     </Typography>
-                    {typeof value === 'string'
-                      ? <Typography variant="body2">{value}</Typography>
-                      : value}
+                    {typeof value === 'string' ? <Typography variant="body2">{value}</Typography> : value}
                   </Box>
                 ))}
               </Stack>
@@ -154,7 +133,6 @@ export default function ProfilePage() {
           </Card>
         </Grid>
 
-        {/* ── Edit form + stats ─────────────────────────────────────── */}
         <Grid item xs={12} md={8}>
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ p: 3 }}>
@@ -163,38 +141,20 @@ export default function ProfilePage() {
               </Typography>
               <Grid container spacing={2.5}>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Full Name"
-                    value={editing ? form.fullName : (user?.fullName || '—')}
-                    onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                    disabled={!editing}
-                    fullWidth
-                  />
+                  <TextField label="Full Name" value={editing ? form.fullName : (user?.fullName || '—')}
+                    onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} disabled={!editing} fullWidth />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Username"
-                    value={user?.username || ''}
-                    disabled
-                    fullWidth
-                    helperText="Username cannot be changed"
-                  />
+                  <TextField label="Username" value={user?.username || ''} disabled fullWidth helperText="Username cannot be changed" />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
-                    label="Email"
-                    type="email"
-                    value={editing ? form.email : (user?.email || '—')}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    disabled={!editing}
-                    fullWidth
-                  />
+                  <TextField label="Email" type="email" value={editing ? form.email : (user?.email || '—')}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} disabled={!editing} fullWidth />
                 </Grid>
               </Grid>
             </CardContent>
           </Card>
 
-          {/* ── Donee stats ── */}
           {doneeStats && (
             <>
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, pl: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -214,7 +174,6 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* ── Fundraiser stats ── */}
           {frStats && (
             <>
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5, pl: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -222,16 +181,16 @@ export default function ProfilePage() {
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <StatCard icon={<PaymentsIcon />}   label="Total Raised"  value={formatCurrency(frStats.raised)} color="primary.main" />
+                  <StatCard icon={<PaymentsIcon />} label="Total Raised" value={formatCurrency(frStats.raised)} color="primary.main" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <StatCard icon={<CampaignIcon />}   label="Active FSAs"   value={frStats.active}  color="success.main" />
+                  <StatCard icon={<CampaignIcon />} label="Active FSAs" value={frStats.active} color="success.main" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <StatCard icon={<VisibilityIcon />} label="Total Views"   value={frStats.views}   color="info.main" />
+                  <StatCard icon={<VisibilityIcon />} label="Total Views" value={frStats.views} color="info.main" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <StatCard icon={<CampaignIcon />}   label="Total FSAs"    value={frStats.total}   color="secondary.main" />
+                  <StatCard icon={<CampaignIcon />} label="Total FSAs" value={frStats.total} color="secondary.main" />
                 </Grid>
               </Grid>
             </>
