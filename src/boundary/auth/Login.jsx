@@ -131,6 +131,10 @@ export default function Login() {
             Don't have an account?{' '}
             <Link component={RouterLink} to="/register">Register here</Link>
           </Typography>
+
+          <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
+            <Link component={RouterLink} to="/">← Return to Home</Link>
+          </Typography>
         </CardContent>
       </Card>
     </Box>

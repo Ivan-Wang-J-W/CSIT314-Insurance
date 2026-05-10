@@ -90,6 +90,10 @@ export default function Register() {
             Already have an account?{' '}
             <Link component={RouterLink} to="/login">Sign in</Link>
           </Typography>
+
+          <Typography variant="body2" sx={{ mt: 2, textAlign: 'center' }}>
+            <Link component={RouterLink} to="/">← Return to Home</Link>
+          </Typography>
         </CardContent>
       </Card>
     </Box>
