@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Archive frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Archive backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-app
+          path: |
+            backend
+            !backend/tests
+            !backend/__pycache__
+            !backend/.pytest_cache
+
+  deploy-backend:
+    name: Deploy Backend to Azure
+    runs-on: ubuntu-latest
+    needs: package
+    if: ${{ secrets.AZURE_WEBAPP_NAME != '' && secrets.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
+
+    steps:
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-app
+          path: backend-release
+
+      - name: Deploy backend app
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend-release
+
+  deploy-placeholder:
+    name: Deployment Placeholder
+    runs-on: ubuntu-latest
+    needs: package
+    if: ${{ secrets.AZURE_WEBAPP_NAME == '' || secrets.AZURE_WEBAPP_PUBLISH_PROFILE == '' }}
+
+    steps:
+      - name: Explain skipped deployment
+        run: |
+          echo "Azure deployment secrets are not configured yet."
+          echo "CI and packaging completed successfully."
+          echo "Set AZURE_WEBAPP_NAME and AZURE_WEBAPP_PUBLISH_PROFILE when the server is ready."
